@@ -42,6 +42,10 @@ api/v1/ c2b/callback [name='call_back']
 - Run Server:
 - ```
   make server
+- Example:
+- ```
+  http://127.0.0.1:8000/api/v1/online/lipa
+*Will send a push notification to theregistered number.*
 
 ## Author:
 __Emmanuel Chalo [linkedin](https://www.linkedin.com/in/emmanuel-chalo-211336183 "LinkedIn")__ 
