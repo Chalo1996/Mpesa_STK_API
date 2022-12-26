@@ -27,6 +27,7 @@ INSTALLED_APPS = [
 ```
 
 ### APIs implemented:
+---
 ```
 api/v1/ access/token [name='get_mpesa_access_token']
 api/v1/ online/lipa [name='lipa_na_mpesa']
