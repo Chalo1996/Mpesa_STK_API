@@ -15,6 +15,7 @@ pip install markdown # Markdown support for the browsable API.
 pip install django-filter
 ```
 - Configuration:
+---
 ```
 Add 'rest_framework' to your INSTALLED_APPS setting:
 ```
