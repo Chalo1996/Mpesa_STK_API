@@ -3,25 +3,47 @@ import json
 from requests.auth import HTTPBasicAuth
 from datetime import datetime
 import base64
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 
 class MpesaC2bCredential:
-    consumer_key = 'S4asRt67AlGLrOofgu8otp7FcxALqRDF'
-    consumer_secret = 'W88M1LI5SMSLeNpl'
-    api_URL = 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials'
+    """Handles Mpesa API credentials"""
+    CONSUMER_KEY = os.getenv('CONSUMER_KEY')
+    CONSUMER_SECRET = os.getenv('CONSUMER_SECRET')
+    TOKEN_URL = os.getenv('TOKEN_URL')
 
-class MpesaAccessToken:
-    r = requests.get(MpesaC2bCredential.api_URL,
-                     auth=HTTPBasicAuth(MpesaC2bCredential.consumer_key, MpesaC2bCredential.consumer_secret))
-    mpesa_access_token = json.loads(r.text)
-    validated_mpesa_access_token = mpesa_access_token['access_token']
+    @staticmethod
+    def get_access_token():
+        """Fetches and returns the Mpesa access token"""
+        response = requests.get(
+            MpesaC2bCredential.TOKEN_URL,
+            auth=HTTPBasicAuth(MpesaC2bCredential.CONSUMER_KEY, MpesaC2bCredential.CONSUMER_SECRET)
+        )
+        response_data = response.json()
+        return response_data.get('access_token')
 
-class LipanaMpesaPpassword:
-    lipa_time = datetime.now().strftime('%Y%m%d%H%M%S')
-    Business_short_code = "174379"
-    passkey = 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919'
 
-    data_to_encode = Business_short_code + passkey + lipa_time
+class LipanaMpesaPassword:
+    """Generates and encodes the Lipa Na Mpesa password"""
+    BUSINESS_SHORT_CODE = os.getenv('BUSINESS_SHORTCODE')
+    PASSKEY = os.getenv('LIPA_NA_MPESA_PASSKEY')
 
-    online_password = base64.b64encode(data_to_encode.encode())
-    decode_password = online_password.decode('utf-8')
+    @staticmethod
+    def generate_password():
+        """Generates Base64 encoded password"""
+        lipa_time = datetime.now().strftime('%Y%m%d%H%M%S')
+        data_to_encode = LipanaMpesaPassword.BUSINESS_SHORT_CODE + LipanaMpesaPassword.PASSKEY + lipa_time
+        encoded_password = base64.b64encode(data_to_encode.encode()).decode('utf-8')
+        return encoded_password, lipa_time
+
+
+if __name__ == "__main__":
+    access_token = MpesaC2bCredential.get_access_token()
+    password, timestamp = LipanaMpesaPassword.generate_password()
+
+    print(f"Access Token: {access_token}")
+    print(f"Generated Password: {password}")
+    print(f"Timestamp: {timestamp}")
