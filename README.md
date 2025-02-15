@@ -12,17 +12,14 @@
 
 ```bash
 sudo apt install python3-pip
-python3 -m pip install django
-pip install djangorestframework
-pip install markdown  # Markdown support for the browsable API
-pip install django-filter
+pip install -r requirements.txt
 ```
 
 ### Configuration
 
 Add 'rest_framework' to your INSTALLED_APPS in settings.py:
 
-```json
+```
 INSTALLED_APPS = [
     ...
     'rest_framework',
@@ -31,7 +28,7 @@ INSTALLED_APPS = [
 
 ### APIs Implemented
 
-```json
+```
 api/v1/access/token [name='get_mpesa_access_token']
 api/v1/online/lipa [name='lipa_na_mpesa']
 api/v1/c2b/register [name='register_mpesa_validation']
