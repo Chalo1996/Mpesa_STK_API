@@ -47,7 +47,7 @@ def lipa_na_mpesa_online(request):
             "PartyA": os.getenv("PARTY_A"),
             "PartyB": LipanaMpesaPassword.BUSINESS_SHORT_CODE,
             "PhoneNumber": os.getenv("PHONE_NUMBER"),
-            "CallBackURL": os.getenv("CALL_BACK_URL"),
+            "CallBackURL": "https://api.hooklistener.com/in/kWKf_PNmM0NSslNacjjeS",
             "AccountReference": os.getenv("ACCOUNT_REFERENCE"),
             "TransactionDesc": "Testing STK push"
         }
@@ -76,8 +76,10 @@ def register_urls(request):
         headers = {"Authorization": f"Bearer {access_token}"}
 
         # Fetch URLs from env
-        confirmation_url = os.getenv("CONFIRMATION_URL")
-        validation_url = os.getenv("VALIDATION_URL")
+        confirmation_url = "https://dd72-102-209-18-64.ngrok-free.app/api/v1/c2b/confirmation"
+        # confirmation_url = os.getenv("CONFIRMATION_URL")
+        validation_url = "https://dd72-102-209-18-64.ngrok-free.app/api/v1/c2b/validation"
+        # validation_url = os.getenv("VALIDATION_URL")
 
         # Debugging prints
         print(f"REGISTER_URL: {api_url}")
@@ -140,6 +142,7 @@ def confirmation(request):
 @csrf_exempt
 def stk_push_callback(request):
     """Handles STK Push callback from M-Pesa (Success or Failure)"""
+    print(f"FOWARDED BODY---> {request.body}")
     try:
         stk_callback_data = json.loads(request.body.decode("utf-8"))
 

@@ -31,11 +31,11 @@ DEBUG = True
 ALLOWED_HOSTS = [
     "127.0.0.1", 
     "localhost",
-    "5a56-102-209-18-64.ngrok-free.app",  # ✅ Add your Ngrok URL
+    "dd72-102-209-18-64.ngrok-free.app",  # ✅ Add Ngrok URL
 ]
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://5a56-102-209-18-64.ngrok-free.app",  # ✅ Add the Ngrok URL with https
+    "https://dd72-102-209-18-64.ngrok-free.app",  # ✅ Add the Ngrok URL with https
 ]
 
 
