@@ -73,7 +73,7 @@ python manage.py runserver
 http://127.0.0.1:8000/api/v1/online/lipa
 ```
 
-This will send a push notification to the registered phone number.
+- `This will send a push notification to the registered phone number.`
 
 Author: Emmanuel Chalo<br/>
 [LinkedIn](https://www.linkedin.com/in/emmanuel-chalo-211336183)<br/>
