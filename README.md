@@ -17,7 +17,7 @@ pip install -r requirements.txt
 
 ### Configuration
 
-Add 'rest_framework' to your INSTALLED_APPS in settings.py:
+Add or verify if 'rest_framework' is added to your INSTALLED_APPS in settings.py:
 
 ```
 INSTALLED_APPS = [
@@ -69,5 +69,6 @@ http://127.0.0.1:8000/api/v1/online/lipa
 
 This will send a push notification to the registered phone number.
 
-Author:
-[Emmanuel Chalo](https://www.linkedin.com/in/emmanuel-chalo-211336183)
+Author: Emmanuel Chalo<br/>
+[LinkedIn](https://www.linkedin.com/in/emmanuel-chalo-211336183)<br/>
+[email](mailto:emusyoka759@gmail.com)
