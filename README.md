@@ -8,6 +8,12 @@
 
 ## Configuration and Installation:
 
+### NB: If you are using a linux system, use the make file.
+#### For more info:
+```bash
+cat Makefile
+```
+
 ### Installation:
 
 ```bash
