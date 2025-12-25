@@ -1,28 +1,42 @@
-from pyngrok import ngrok
-import time
-from dotenv import load_dotenv
 import os
+import time
 
-# Load environment variables
-load_dotenv()
+from dotenv import load_dotenv
+from pyngrok import ngrok
 
-# Authenticate with ngrok
-auth_token = os.getenv("NGROK_AUTHTOKEN")
-if not auth_token:
-    raise ValueError("NGROK_AUTHTOKEN is not set in .env file!")
 
-ngrok.set_auth_token(auth_token)
+def main() -> int:
+    # Load environment variables from .env if present
+    load_dotenv()
 
-# Establish connectivity
-public_url = ngrok.connect(8000).public_url
+    # Optional auth token (recommended but not strictly required)
+    auth_token = os.getenv("NGROK_AUTHTOKEN")
+    if auth_token:
+        ngrok.set_auth_token(auth_token)
 
-# Output ngrok URL to console
-print(f"Ngrok tunnel is running at: {public_url}")
+    port = int(os.getenv("NGROK_PORT", "8000"))
+    tunnel = ngrok.connect(addr=port)
+    public_url = tunnel.public_url
 
-# Keep the listener alive
-try:
-    while True:
-        time.sleep(1)
-except KeyboardInterrupt:
-    print("Shutting down ngrok tunnel...")
-    ngrok.kill()
+    print(f"Ngrok tunnel is running at: {public_url}")
+    print("Press Ctrl+C to stop.")
+
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        return 0
+    finally:
+        # Best-effort cleanup
+        try:
+            ngrok.disconnect(public_url)
+        except Exception:
+            pass
+        try:
+            ngrok.kill()
+        except Exception:
+            pass
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

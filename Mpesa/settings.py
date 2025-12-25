@@ -11,9 +11,39 @@ https://docs.djangoproject.com/en/3.0/ref/settings/
 """
 
 import os
+import sys
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "t", "yes", "y", "on"}
+
+
+def _env_csv(name: str, default=None):
+    value = os.getenv(name)
+    if value is None:
+        return default if default is not None else []
+    return [part.strip() for part in value.split(",") if part.strip()]
+
+
+INTERNAL_RATE_LIMIT_ENABLED = _env_bool("INTERNAL_RATE_LIMIT_ENABLED", default=True)
+INTERNAL_RATE_LIMIT_REQUESTS = int(os.getenv("INTERNAL_RATE_LIMIT_REQUESTS", "30"))
+INTERNAL_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("INTERNAL_RATE_LIMIT_WINDOW_SECONDS", "60"))
+INTERNAL_RATE_LIMIT_PATHS = _env_csv(
+    "INTERNAL_RATE_LIMIT_PATHS",
+    default=[
+        "/api/v1/access/token",
+        "/api/v1/online/lipa",
+        "/api/v1/c2b/register",
+        "/api/v1/transactions/all",
+        "/api/v1/transactions/completed",
+    ],
+)
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -23,20 +53,23 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # See https://docs.djangoproject.com/en/3.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = '_we6(*0g8=w(z-^uhlxswj&e+1sg#uf_pap1*fpe^&!jui5h23'
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-insecure-secret-key")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = _env_bool("DJANGO_DEBUG", default=True)
 
-ALLOWED_HOSTS = [
-    "127.0.0.1", 
-    "localhost",
-    "dd72-102-209-18-64.ngrok-free.app",  # ✅ Add Ngrok URL
-]
+ALLOWED_HOSTS = _env_csv(
+    "DJANGO_ALLOWED_HOSTS",
+    default=["127.0.0.1", "localhost"],
+)
 
-CSRF_TRUSTED_ORIGINS = [
-    "https://dd72-102-209-18-64.ngrok-free.app",  # ✅ Add the Ngrok URL with https
-]
+CSRF_TRUSTED_ORIGINS = _env_csv(
+    "DJANGO_CSRF_TRUSTED_ORIGINS",
+    default=[],
+)
+
+if not DEBUG and SECRET_KEY == "dev-insecure-secret-key":
+    raise RuntimeError("DJANGO_SECRET_KEY must be set when DJANGO_DEBUG is false")
 
 
 # Application definition
@@ -59,6 +92,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
+    'mpesa_api.middleware.InternalEndpointsRateLimitMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -88,17 +122,33 @@ WSGI_APPLICATION = 'Mpesa.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/3.0/ref/settings/#databases
+#
+# Dev-friendly default: if Postgres env vars are not provided, fall back to SQLite.
+DB_NAME = os.getenv("DB_NAME")
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME'),
-        'USER': os.getenv("DB_USER"),
-        'PASSWORD': os.getenv("DB_PASSWORD"),
-        'HOST': os.getenv("DB_HOST"),
-        'PORT': os.getenv("DB_PORT")
+RUNNING_TESTS = "test" in sys.argv
+TEST_USE_POSTGRES = _env_bool("DJANGO_TEST_USE_POSTGRES", default=False)
+
+use_postgres = bool(DB_NAME) and (not RUNNING_TESTS or TEST_USE_POSTGRES)
+
+if use_postgres:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": DB_NAME,
+            "USER": os.getenv("DB_USER"),
+            "PASSWORD": os.getenv("DB_PASSWORD"),
+            "HOST": os.getenv("DB_HOST"),
+            "PORT": os.getenv("DB_PORT"),
+        }
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": os.path.join(BASE_DIR, "db.sqlite3"),
+        }
+    }
 
 
 # Password validation
@@ -138,3 +188,21 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/3.0/howto/static-files/
 
 STATIC_URL = '/static/'
+
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "mpesa-stk-api",
+    }
+}
+
+
+if not DEBUG:
+    SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "0"))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = _env_bool("SECURE_HSTS_INCLUDE_SUBDOMAINS", default=False)
+    SECURE_HSTS_PRELOAD = _env_bool("SECURE_HSTS_PRELOAD", default=False)
+    SECURE_SSL_REDIRECT = _env_bool("SECURE_SSL_REDIRECT", default=False)
+    SESSION_COOKIE_SECURE = _env_bool("SESSION_COOKIE_SECURE", default=True)
+    CSRF_COOKIE_SECURE = _env_bool("CSRF_COOKIE_SECURE", default=True)
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
