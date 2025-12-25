@@ -6,6 +6,8 @@ import { CallsLogPage } from "./pages/CallsLogPage";
 import { CallbacksLogPage } from "./pages/CallbacksLogPage";
 import { B2bBulkPage } from "./pages/B2bBulkPage";
 import { B2cBulkPage } from "./pages/B2cBulkPage";
+import { QrCodePage } from "./pages/QrCodePage";
+import { RatibaPage } from "./pages/RatibaPage";
 import { RegisterC2BPage } from "./pages/RegisterC2BPage";
 import { StkErrorsLogPage } from "./pages/StkErrorsLogPage";
 import { StkPushPage } from "./pages/StkPushPage";
@@ -66,6 +68,22 @@ function App() {
             B2B Bulk
           </NavLink>
           <NavLink
+            to='/qr'
+            className={({ isActive }) =>
+              isActive ? "nav__link nav__link--active" : "nav__link"
+            }
+          >
+            QR
+          </NavLink>
+          <NavLink
+            to='/ratiba'
+            className={({ isActive }) =>
+              isActive ? "nav__link nav__link--active" : "nav__link"
+            }
+          >
+            Ratiba
+          </NavLink>
+          <NavLink
             to='/logs/calls'
             className={({ isActive }) =>
               isActive ? "nav__link nav__link--active" : "nav__link"
@@ -102,6 +120,8 @@ function App() {
           <Route path='/transactions' element={<TransactionsPage />} />
           <Route path='/b2c/bulk' element={<B2cBulkPage />} />
           <Route path='/b2b/bulk' element={<B2bBulkPage />} />
+          <Route path='/qr' element={<QrCodePage />} />
+          <Route path='/ratiba' element={<RatibaPage />} />
           <Route path='/logs/calls' element={<CallsLogPage />} />
           <Route path='/logs/callbacks' element={<CallbacksLogPage />} />
           <Route path='/logs/stk-errors' element={<StkErrorsLogPage />} />

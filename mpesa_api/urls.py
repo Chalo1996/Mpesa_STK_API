@@ -23,6 +23,8 @@ urlpatterns = [
     # New services
     path('b2c/', include('b2c_api.urls')),
     path('b2b/', include('b2b_api.urls')),
+    path('qr/', include('qr_api.urls')),
+    path('ratiba/', include('ratiba_api.urls')),
 
     # Admin-only (API key protected) log endpoints
     path('admin/logs/calls', views.admin_calls_log, name="admin_calls_log"),

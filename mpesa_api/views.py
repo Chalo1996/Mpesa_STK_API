@@ -27,12 +27,14 @@ def lipa_na_mpesa_online(request):
     return c2b.stk_push(request)
 
 
+@csrf_exempt
 def stk_push_callback(request):
     from c2b_api import views as c2b
 
     return c2b.stk_callback(request)
 
 
+@csrf_exempt
 def stk_push_error(request):
     from c2b_api import views as c2b
 
@@ -92,7 +94,7 @@ def auth_login(request):
     if not user:
         return JsonResponse({"error": "Invalid credentials"}, status=401)
     if not getattr(user, "is_staff", False):
-        return JsonResponse({"error": "Staff access required"}, status=403)
+        return JsonResponse({"error": "Please sign in with a staff account to continue."}, status=403)
 
     login(request, user)
     return JsonResponse({"ok": True, "username": user.username, "is_staff": True})

@@ -72,6 +72,8 @@ Key variables:
 - `BUSINESS_SHORTCODE` and `LIPA_NA_MPESA_PASSKEY` (STK password generation)
 - `C2B_SHORTCODE` (for C2B URL registration; sandbox commonly uses `600000`)
 - `STK_CALLBACK_URL`, `CONFIRMATION_URL`, `VALIDATION_URL`
+- `MPESA_QR_CODE_URL` (M-Pesa QR code generation endpoint)
+- `MPESA_RATIBA_URL` (M-Pesa Ratiba standing order endpoint)
 
 ## Security
 
@@ -168,6 +170,8 @@ GET  /api/v1/b2c/bulk/<batch_id>
 POST /api/v1/b2b/bulk
 GET  /api/v1/b2b/bulk
 GET  /api/v1/b2b/bulk/<batch_id>
+
+POST /api/v1/qr/generate
 ```
 
 ## Usage Guide

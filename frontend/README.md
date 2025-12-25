@@ -2,6 +2,8 @@
 
 This is a small React dashboard used to operate and inspect the Django backend in this repo.
 
+Includes a QR page that calls `POST /api/v1/qr/generate`.
+
 ## Auth
 
 The dashboard uses **Django session auth** (staff-only). You must create a Django admin/superuser and log in from the dashboard.

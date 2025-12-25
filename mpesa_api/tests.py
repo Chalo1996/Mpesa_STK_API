@@ -3,7 +3,7 @@ import os
 
 from django.core.cache import cache
 from django.contrib.auth import get_user_model
-from django.test import RequestFactory, TestCase, override_settings
+from django.test import Client, RequestFactory, TestCase, override_settings
 
 from .models import MpesaCallBacks, MpesaCalls, MpesaPayment
 from .views import (
@@ -79,6 +79,17 @@ class MpesaViewsTests(TestCase):
 		self.assertEqual(payment.status, "successful")
 		self.assertEqual(MpesaCallBacks.objects.count(), 1)
 
+	def test_stk_callback_endpoint_is_csrf_exempt(self):
+		"""M-Pesa callbacks won't include CSRF cookies/tokens; endpoint must accept POST."""
+		csrf_client = Client(enforce_csrf_checks=True)
+		payload = {"Body": {"stkCallback": {"MerchantRequestID": "m", "CheckoutRequestID": "c"}}}
+		response = csrf_client.post(
+			"/api/v1/stk/callback",
+			data=json.dumps(payload),
+			content_type="application/json",
+		)
+		self.assertEqual(response.status_code, 200)
+
 
 class InternalAuthTests(TestCase):
 	def setUp(self):
@@ -136,6 +147,61 @@ class InternalAuthTests(TestCase):
 		self.assertEqual(resp_errors.status_code, 200)
 		self.assertIn("results", resp_errors.json())
 		self.assertGreaterEqual(len(resp_errors.json()["results"]), 1)
+
+
+class SessionAuthCsrfTests(TestCase):
+	def setUp(self):
+		User = get_user_model()
+		self.user = User.objects.create_user(username="staff", password="pw")
+		self.user.is_staff = True
+		self.user.save()
+
+	def test_auth_login_requires_csrf(self):
+		csrf_client = Client(enforce_csrf_checks=True)
+
+		# No CSRF cookie/token -> blocked
+		resp = csrf_client.post(
+			"/api/v1/auth/login",
+			data=json.dumps({"username": "staff", "password": "pw"}),
+			content_type="application/json",
+		)
+		self.assertEqual(resp.status_code, 403)
+
+		# Fetch CSRF cookie, then login with token
+		csrf_client.get("/api/v1/auth/csrf")
+		token = csrf_client.cookies.get("csrftoken").value
+		resp2 = csrf_client.post(
+			"/api/v1/auth/login",
+			data=json.dumps({"username": "staff", "password": "pw"}),
+			content_type="application/json",
+			HTTP_X_CSRFTOKEN=token,
+		)
+		self.assertEqual(resp2.status_code, 200)
+
+	def test_auth_logout_requires_csrf(self):
+		csrf_client = Client(enforce_csrf_checks=True)
+		csrf_client.get("/api/v1/auth/csrf")
+		token = csrf_client.cookies.get("csrftoken").value
+
+		# Login first
+		resp_login = csrf_client.post(
+			"/api/v1/auth/login",
+			data=json.dumps({"username": "staff", "password": "pw"}),
+			content_type="application/json",
+			HTTP_X_CSRFTOKEN=token,
+		)
+		self.assertEqual(resp_login.status_code, 200)
+
+		# Django can rotate CSRF token on login; use the current cookie value.
+		token = csrf_client.cookies.get("csrftoken").value
+
+		# Logout without token -> blocked
+		resp_bad = csrf_client.post("/api/v1/auth/logout")
+		self.assertEqual(resp_bad.status_code, 403)
+
+		# Logout with token -> ok
+		resp_ok = csrf_client.post("/api/v1/auth/logout", HTTP_X_CSRFTOKEN=token)
+		self.assertEqual(resp_ok.status_code, 200)
 
 
 class RateLimitMiddlewareTests(TestCase):

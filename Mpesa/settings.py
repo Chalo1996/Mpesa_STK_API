@@ -14,7 +14,12 @@ import os
 import sys
 from dotenv import load_dotenv
 
-load_dotenv()
+# Build paths inside the project like this: os.path.join(BASE_DIR, ...)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Load environment variables from the project root `.env` regardless of the
+# current working directory (gunicorn/systemd often changes CWD).
+load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -47,12 +52,10 @@ INTERNAL_RATE_LIMIT_PATHS = _env_csv(
         "/api/v1/c2b/transactions/completed",
         "/api/v1/b2c/bulk",
         "/api/v1/b2b/bulk",
+        "/api/v1/qr/generate",
+        "/api/v1/ratiba/create",
     ],
 )
-
-# Build paths inside the project like this: os.path.join(BASE_DIR, ...)
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.0/howto/deployment/checklist/
@@ -84,6 +87,8 @@ INSTALLED_APPS = [
     'c2b_api',
     'b2c_api',
     'b2b_api',
+    'qr_api',
+    'ratiba_api',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',

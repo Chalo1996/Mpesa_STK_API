@@ -265,7 +265,7 @@ def stk_error(request):
         return JsonResponse({"error": str(e)}, status=500)
 
 
-@require_internal_api_key
+@require_internal_api_key(message="Please sign in with a staff account to view transactions.")
 def transactions_completed(request):
     """Fetch completed M-Pesa transactions with optional filters."""
     if request.method != "GET":
@@ -297,7 +297,7 @@ def transactions_completed(request):
         return JsonResponse({"error": str(e)}, status=500)
 
 
-@require_internal_api_key
+@require_internal_api_key(message="Please sign in with a staff account to view transactions.")
 def transactions_all(request):
     """Fetch all M-Pesa transactions."""
     if request.method != "GET":
