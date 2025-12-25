@@ -26,8 +26,8 @@ export function TransactionsPage() {
     try {
       const path =
         selectedMode === "completed"
-          ? "/api/v1/transactions/completed"
-          : "/api/v1/transactions/all";
+          ? "/api/v1/c2b/transactions/completed"
+          : "/api/v1/c2b/transactions/all";
       const result = await apiRequest(path, { method: "GET" });
       setStatus(result.status);
 
@@ -96,8 +96,8 @@ export function TransactionsPage() {
     <section className='page'>
       <h1 className='page__title'>Transactions</h1>
       <p className='page__desc'>
-        Calls <code>/api/v1/transactions/all</code> or{" "}
-        <code>/api/v1/transactions/completed</code> (protected).
+        Calls <code>/api/v1/c2b/transactions/all</code> or{" "}
+        <code>/api/v1/c2b/transactions/completed</code> (protected).
       </p>
 
       <div className='actions'>

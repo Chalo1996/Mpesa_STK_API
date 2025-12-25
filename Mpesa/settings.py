@@ -81,6 +81,7 @@ if not DEBUG and SECRET_KEY == "dev-insecure-secret-key":
 
 INSTALLED_APPS = [
     'mpesa_api',
+    'c2b_api',
     'b2c_api',
     'b2b_api',
     'django.contrib.admin',

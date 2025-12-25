@@ -4,6 +4,8 @@ import { AuthBanner } from "./components/AuthBanner";
 import { AccessTokenPage } from "./pages/AccessTokenPage";
 import { CallsLogPage } from "./pages/CallsLogPage";
 import { CallbacksLogPage } from "./pages/CallbacksLogPage";
+import { B2bBulkPage } from "./pages/B2bBulkPage";
+import { B2cBulkPage } from "./pages/B2cBulkPage";
 import { RegisterC2BPage } from "./pages/RegisterC2BPage";
 import { StkErrorsLogPage } from "./pages/StkErrorsLogPage";
 import { StkPushPage } from "./pages/StkPushPage";
@@ -48,6 +50,22 @@ function App() {
             Transactions
           </NavLink>
           <NavLink
+            to='/b2c/bulk'
+            className={({ isActive }) =>
+              isActive ? "nav__link nav__link--active" : "nav__link"
+            }
+          >
+            B2C Bulk
+          </NavLink>
+          <NavLink
+            to='/b2b/bulk'
+            className={({ isActive }) =>
+              isActive ? "nav__link nav__link--active" : "nav__link"
+            }
+          >
+            B2B Bulk
+          </NavLink>
+          <NavLink
             to='/logs/calls'
             className={({ isActive }) =>
               isActive ? "nav__link nav__link--active" : "nav__link"
@@ -82,6 +100,8 @@ function App() {
           <Route path='/stk' element={<StkPushPage />} />
           <Route path='/c2b/register' element={<RegisterC2BPage />} />
           <Route path='/transactions' element={<TransactionsPage />} />
+          <Route path='/b2c/bulk' element={<B2cBulkPage />} />
+          <Route path='/b2b/bulk' element={<B2bBulkPage />} />
           <Route path='/logs/calls' element={<CallsLogPage />} />
           <Route path='/logs/callbacks' element={<CallbacksLogPage />} />
           <Route path='/logs/stk-errors' element={<StkErrorsLogPage />} />

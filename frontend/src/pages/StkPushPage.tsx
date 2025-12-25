@@ -102,7 +102,7 @@ export function StkPushPage() {
     if (partyA.trim()) payload.party_a = partyA.trim();
 
     try {
-      const result = await apiRequest("/api/v1/online/lipa", {
+      const result = await apiRequest("/api/v1/c2b/stk/push", {
         method: "POST",
         body: JSON.stringify(payload),
       });
@@ -141,7 +141,7 @@ export function StkPushPage() {
     <section className='page'>
       <h1 className='page__title'>STK Push</h1>
       <p className='page__desc'>
-        Calls <code>/api/v1/online/lipa</code> (protected).
+        Calls <code>/api/v1/c2b/stk/push</code> (protected).
       </p>
 
       <form className='form' onSubmit={submit}>
@@ -180,9 +180,9 @@ export function StkPushPage() {
             disabled={loading || waitingForCallback || !phoneNumber.trim()}
           >
             {loading
-              ? "Sending"
+              ? "Sending…"
               : waitingForCallback
-              ? "Waiting for callback"
+              ? "Waiting for callback…"
               : "Initiate STK Push"}
           </button>
           {status !== null ? (

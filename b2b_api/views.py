@@ -4,7 +4,7 @@ from decimal import Decimal, InvalidOperation
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
-from mpesa_api.views import require_internal_api_key
+from services_common.auth import require_internal_api_key
 
 from .models import BulkBusinessPaymentBatch, BulkBusinessPaymentItem
 
