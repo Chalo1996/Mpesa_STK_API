@@ -6,6 +6,9 @@ from django.views.decorators.csrf import csrf_exempt
 import datetime
 from dotenv import load_dotenv
 import os
+from django.contrib.auth import authenticate, login, logout
+from django.middleware.csrf import get_token
+from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
 
 from .mpesa_credentials import MpesaC2bCredential, LipanaMpesaPassword
 from .models import MpesaPayment, MpesaCallBacks, MpesaCalls
@@ -55,6 +58,11 @@ def _get_provided_api_key(request):
 def require_internal_api_key(view_func):
     @wraps(view_func)
     def _wrapped(request, *args, **kwargs):
+        # If a staff user is logged in via Django session auth, allow access.
+        user = getattr(request, "user", None)
+        if user and getattr(user, "is_authenticated", False) and getattr(user, "is_staff", False):
+            return view_func(request, *args, **kwargs)
+
         required = os.getenv("INTERNAL_API_KEY")
         if not required:
             return JsonResponse({"error": "INTERNAL_API_KEY is not set"}, status=500)
@@ -68,6 +76,74 @@ def require_internal_api_key(view_func):
         return view_func(request, *args, **kwargs)
 
     return _wrapped
+
+
+def require_staff(view_func):
+    @wraps(view_func)
+    def _wrapped(request, *args, **kwargs):
+        user = getattr(request, "user", None)
+        if not user or not getattr(user, "is_authenticated", False):
+            return JsonResponse({"error": "Authentication required"}, status=401)
+        if not getattr(user, "is_staff", False):
+            return JsonResponse({"error": "Staff access required"}, status=403)
+        return view_func(request, *args, **kwargs)
+
+    return _wrapped
+
+
+@ensure_csrf_cookie
+def auth_csrf(request):
+    """Sets CSRF cookie and returns a token for SPA usage."""
+    if request.method != "GET":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+    return JsonResponse({"csrfToken": get_token(request)})
+
+
+def auth_me(request):
+    if request.method != "GET":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+
+    user = getattr(request, "user", None)
+    if not user or not getattr(user, "is_authenticated", False):
+        return JsonResponse({"authenticated": False})
+
+    return JsonResponse(
+        {
+            "authenticated": True,
+            "username": getattr(user, "username", ""),
+            "is_staff": bool(getattr(user, "is_staff", False)),
+        }
+    )
+
+
+@csrf_protect
+def auth_login(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+
+    body = _json_body(request)
+    username = str(body.get("username", "")).strip()
+    password = str(body.get("password", ""))
+
+    if not username or not password:
+        return JsonResponse({"error": "Missing username or password"}, status=400)
+
+    user = authenticate(request, username=username, password=password)
+    if not user:
+        return JsonResponse({"error": "Invalid credentials"}, status=401)
+    if not getattr(user, "is_staff", False):
+        return JsonResponse({"error": "Staff access required"}, status=403)
+
+    login(request, user)
+    return JsonResponse({"ok": True, "username": user.username, "is_staff": True})
+
+
+@csrf_protect
+def auth_logout(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+    logout(request)
+    return JsonResponse({"ok": True})
 
 @require_internal_api_key
 def get_access_token(request):
@@ -359,5 +435,57 @@ def all_transactions(request):
         transactions_data = list(transactions.values())
         return JsonResponse({"transactions": transactions_data})
 
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+def _parse_limit_param(request, default=200, max_limit=1000):
+    raw = request.GET.get("limit", "")
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+        if value <= 0:
+            return default
+        return min(value, max_limit)
+    except Exception:
+        return default
+
+
+@require_staff
+def admin_calls_log(request):
+    """Admin-only: list stored M-Pesa call logs."""
+    if request.method != "GET":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+    try:
+        limit = _parse_limit_param(request)
+        rows = MpesaCalls.objects.all()[:limit]
+        return JsonResponse({"results": list(rows.values())})
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+@require_staff
+def admin_callbacks_log(request):
+    """Admin-only: list stored M-Pesa callback payloads (STK callbacks and STK errors)."""
+    if request.method != "GET":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+    try:
+        limit = _parse_limit_param(request)
+        rows = MpesaCallBacks.objects.all()[:limit]
+        return JsonResponse({"results": list(rows.values())})
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+@require_staff
+def admin_stk_errors_log(request):
+    """Admin-only: list STK error callbacks."""
+    if request.method != "GET":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+    try:
+        limit = _parse_limit_param(request)
+        rows = MpesaCallBacks.objects.filter(caller="STK Push Error")[:limit]
+        return JsonResponse({"results": list(rows.values())})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)

@@ -2,10 +2,19 @@ import json
 import os
 
 from django.core.cache import cache
+from django.contrib.auth import get_user_model
 from django.test import RequestFactory, TestCase, override_settings
 
 from .models import MpesaCallBacks, MpesaCalls, MpesaPayment
-from .views import all_transactions, confirmation, get_access_token, stk_push_callback
+from .views import (
+	admin_calls_log,
+	admin_callbacks_log,
+	admin_stk_errors_log,
+	all_transactions,
+	confirmation,
+	get_access_token,
+	stk_push_callback,
+)
 
 
 class MpesaViewsTests(TestCase):
@@ -85,6 +94,48 @@ class InternalAuthTests(TestCase):
 		request = self.factory.get("/api/v1/transactions/all")
 		response = all_transactions(request)
 		self.assertEqual(response.status_code, 401)
+
+	def test_admin_calls_log_requires_api_key(self):
+		request = self.factory.get("/api/v1/admin/logs/calls")
+		response = admin_calls_log(request)
+		self.assertEqual(response.status_code, 401)
+
+	def test_admin_logs_return_data_when_authorized(self):
+		MpesaCalls.objects.create(
+			ip_address="127.0.0.1",
+			caller="Test",
+			conversation_id="c1",
+			content="{}",
+		)
+		MpesaCallBacks.objects.create(
+			ip_address="127.0.0.1",
+			caller="STK Push Error",
+			conversation_id="m1",
+			content={"ResultCode": 1},
+			result_code=1,
+			result_description="Fail",
+		)
+
+		User = get_user_model()
+		user = User.objects.create_user(username="staff", password="pw")
+		user.is_staff = True
+		user.save()
+		self.client.force_login(user)
+
+		resp_calls = self.client.get("/api/v1/admin/logs/calls")
+		self.assertEqual(resp_calls.status_code, 200)
+		self.assertIn("results", resp_calls.json())
+		self.assertGreaterEqual(len(resp_calls.json()["results"]), 1)
+
+		resp_callbacks = self.client.get("/api/v1/admin/logs/callbacks")
+		self.assertEqual(resp_callbacks.status_code, 200)
+		self.assertIn("results", resp_callbacks.json())
+		self.assertGreaterEqual(len(resp_callbacks.json()["results"]), 1)
+
+		resp_errors = self.client.get("/api/v1/admin/logs/stk-errors")
+		self.assertEqual(resp_errors.status_code, 200)
+		self.assertIn("results", resp_errors.json())
+		self.assertGreaterEqual(len(resp_errors.json()["results"]), 1)
 
 
 class RateLimitMiddlewareTests(TestCase):
