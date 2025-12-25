@@ -39,9 +39,14 @@ INTERNAL_RATE_LIMIT_PATHS = _env_csv(
     default=[
         "/api/v1/access/token",
         "/api/v1/online/lipa",
+        "/api/v1/c2b/stk/push",
         "/api/v1/c2b/register",
         "/api/v1/transactions/all",
         "/api/v1/transactions/completed",
+        "/api/v1/c2b/transactions/all",
+        "/api/v1/c2b/transactions/completed",
+        "/api/v1/b2c/bulk",
+        "/api/v1/b2b/bulk",
     ],
 )
 
@@ -76,6 +81,8 @@ if not DEBUG and SECRET_KEY == "dev-insecure-secret-key":
 
 INSTALLED_APPS = [
     'mpesa_api',
+    'b2c_api',
+    'b2b_api',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
