@@ -38,11 +38,32 @@ export function TransactionsPage() {
         setTransactions(list);
       } else {
         setTransactions([]);
-        setError(
-          typeof result.data === "object"
-            ? JSON.stringify(result.data)
-            : String(result.data || "Request failed")
-        );
+        const apiError =
+          typeof result.data === "object" && result.data
+            ? String((result.data as any).error || "")
+            : "";
+
+        if (result.status === 401 && apiError === "Missing API key") {
+          setError("Please sign in with a staff account to view transactions.");
+        } else if (
+          result.status === 401 &&
+          apiError === "Authentication required"
+        ) {
+          setError("Please sign in with a staff account to view transactions.");
+        } else if (
+          result.status === 403 &&
+          apiError === "Staff access required"
+        ) {
+          setError(
+            "Staff access required. Please sign in with a staff account."
+          );
+        } else {
+          setError(
+            typeof result.data === "object"
+              ? JSON.stringify(result.data)
+              : String(result.data || "Request failed")
+          );
+        }
       }
     } finally {
       setLoading(false);
