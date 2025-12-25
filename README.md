@@ -84,6 +84,8 @@ Send the key using either:
 - `X-API-Key: <your key>` (recommended)
 - or `Authorization: Bearer <your key>`
 
+If you are logged in as a **Django staff user** (session auth), these protected endpoints are also allowed for the dashboard.
+
 Callback endpoints are intentionally **not** protected by this key (Safaricom must call them).
 
 ### Rate Limiting
@@ -124,6 +126,11 @@ After updating `.env`, restart Django.
 ## Endpoints
 
 ```text
+GET  /api/v1/auth/csrf
+GET  /api/v1/auth/me
+POST /api/v1/auth/login
+POST /api/v1/auth/logout
+
 GET  /api/v1/access/token
 POST /api/v1/online/lipa
 POST /api/v1/c2b/register
@@ -133,6 +140,10 @@ POST /api/v1/stk/callback
 POST /api/v1/stk/error
 GET  /api/v1/transactions/all
 GET  /api/v1/transactions/completed
+
+GET  /api/v1/admin/logs/calls
+GET  /api/v1/admin/logs/callbacks
+GET  /api/v1/admin/logs/stk-errors
 ```
 
 ## Usage Guide
@@ -149,6 +160,40 @@ Run the test suite:
 
 ```bash
 python manage.py test
+```
+
+## Dashboard (React)
+
+This repo includes a small React dashboard in `frontend/` for calling the existing API endpoints.
+
+The dashboard uses **Django session auth** (staff-only) rather than a shared API key.
+
+1. Start Django (port 8000):
+
+```bash
+make run
+```
+
+2. Create a Django admin user (staff):
+
+```bash
+make superuser
+```
+
+3. Start the dashboard (port 5173):
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Then open `http://localhost:5173` and log in using the Django admin username/password.
+
+If you get CSRF errors during login, ensure your `.env` includes:
+
+```dotenv
+DJANGO_CSRF_TRUSTED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 ```
 
 ## Author

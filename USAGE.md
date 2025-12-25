@@ -2,9 +2,46 @@
 
 This file contains copy/paste commands for common tasks when running this project locally.
 
+## Dashboard (admin/staff session)
+
+The React dashboard uses **Django session auth** (staff-only).
+
+1. Start Django:
+
+```bash
+source .venv/bin/activate
+make migrations
+make run
+```
+
+2. Create a staff user (superuser):
+
+```bash
+source .venv/bin/activate
+make superuser
+```
+
+3. Start the dashboard:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open `http://localhost:5173` and log in with your Django admin username/password.
+
+If you see CSRF errors, add this to `.env`:
+
+```dotenv
+DJANGO_CSRF_TRUSTED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+```
+
 ## 1) Create an API key
 
 The API uses an internal API key to protect non-callback endpoints.
+
+Note: this API key is mainly for calling the API directly (curl/Postman). The dashboard uses session auth.
 
 Generate a strong key:
 
