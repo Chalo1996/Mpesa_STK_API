@@ -1,4 +1,4 @@
-# Usage
+# Mobile Money – Usage
 
 This file contains copy/paste commands for common tasks when running this project locally.
 

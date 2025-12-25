@@ -13,7 +13,7 @@ function App() {
   return (
     <div className='app'>
       <header className='app__header'>
-        <div className='app__brand'>Mpesa Dashboard</div>
+        <div className='app__brand'>Mobile Money Dashboard</div>
         <nav className='app__nav'>
           <NavLink
             to='/token'

@@ -1,4 +1,4 @@
-# Mpesa Dashboard (React)
+# Mobile Money Dashboard (React)
 
 This is a small React dashboard used to operate and inspect the Django backend in this repo.
 

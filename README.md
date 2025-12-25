@@ -1,12 +1,18 @@
-# Mpesa STK Push API (Django)
+# Mobile Money (Django)
 
-This project is a Django + Django REST Framework API that demonstrates M-Pesa integration for:
+This project is a Django + Django REST Framework API that demonstrates Mobile Money integration (Safaricom M-Pesa) for:
 
 - STK Push initiation (Lipa Na M-Pesa Online)
 - Receiving STK callbacks and errors
 - Registering C2B Confirmation/Validation URLs
 - Receiving C2B Confirmation/Validation callbacks
 - Viewing stored transactions
+
+The codebase is organized in a service-oriented way:
+
+- **C2B** (STK Push + C2B callbacks) — existing service
+- **B2C** (bulk payouts) — to be added
+- **B2B** (bulk business payments) — to be added
 
 The API is designed for local development and sandbox testing. It supports using **ngrok** so Safaricom can reach your local callback endpoints.
 
@@ -144,6 +150,24 @@ GET  /api/v1/transactions/completed
 GET  /api/v1/admin/logs/calls
 GET  /api/v1/admin/logs/callbacks
 GET  /api/v1/admin/logs/stk-errors
+
+# Service-style prefixes (aliases / new services)
+POST /api/v1/c2b/stk/push
+POST /api/v1/c2b/stk/callback
+POST /api/v1/c2b/stk/error
+POST /api/v1/c2b/register
+POST /api/v1/c2b/confirmation
+POST /api/v1/c2b/validation
+GET  /api/v1/c2b/transactions/all
+GET  /api/v1/c2b/transactions/completed
+
+POST /api/v1/b2c/bulk
+GET  /api/v1/b2c/bulk
+GET  /api/v1/b2c/bulk/<batch_id>
+
+POST /api/v1/b2b/bulk
+GET  /api/v1/b2b/bulk
+GET  /api/v1/b2b/bulk/<batch_id>
 ```
 
 ## Usage Guide
