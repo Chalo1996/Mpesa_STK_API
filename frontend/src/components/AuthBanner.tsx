@@ -43,6 +43,7 @@ export function AuthBanner() {
       if (result.status >= 200 && result.status < 300) {
         setPassword("");
         await refreshMe();
+        window.dispatchEvent(new Event("mpesa-auth-changed"));
       } else {
         setMessage(
           typeof result.data === "object"
@@ -66,6 +67,7 @@ export function AuthBanner() {
       });
       if (result.status >= 200 && result.status < 300) {
         await refreshMe();
+        window.dispatchEvent(new Event("mpesa-auth-changed"));
       } else {
         setMessage(
           typeof result.data === "object"

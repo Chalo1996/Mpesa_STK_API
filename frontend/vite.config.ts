@@ -8,8 +8,8 @@ export default defineConfig({
     proxy: {
       // Django runs on :8000 and serves API under /api/v1/...
       "/api": {
-        target: "http://127.0.0.1:8000",
-        changeOrigin: true,
+        target: "http://localhost:8000",
+        changeOrigin: false,
       },
     },
   },
