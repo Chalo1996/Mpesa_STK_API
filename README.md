@@ -1,158 +1,80 @@
-# Mpesa STK Push API (Django)
+# Mpesa STK Push Notification API Implementation
 
-This project is a Django + Django REST Framework API that demonstrates M-Pesa integration for:
+## Frameworks Used:
 
-- STK Push initiation (Lipa Na M-Pesa Online)
-- Receiving STK callbacks and errors
-- Registering C2B Confirmation/Validation URLs
-- Receiving C2B Confirmation/Validation callbacks
-- Viewing stored transactions
+- Django Rest Framework
 
-The API is designed for local development and sandbox testing. It supports using **ngrok** so Safaricom can reach your local callback endpoints.
+---
 
-## Tech Stack
+## Configuration and Installation:
 
-- Django
-- Django REST Framework
-- PostgreSQL (optional) or SQLite (default for tests / dev fallback)
-
-## Quick Start (Local)
-
-If you are using Linux/macOS, you can use the Makefile targets:
-
+### NB: If you are using a linux system, use the make file.
+#### For more info:
 ```bash
 cat Makefile
 ```
 
-Create a virtual environment and install dependencies:
+### Installation:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
+sudo apt install python3-pip
 pip install -r requirements.txt
 ```
 
-Create your environment file:
+### Configuration
 
-```bash
-cp .env.example .env
+Add or verify if 'rest_framework' is added to your INSTALLED_APPS in settings.py:
+
+```
+INSTALLED_APPS = [
+    ...
+    'rest_framework',
+]
 ```
 
-Then update `.env` with your real credentials and URLs.
+### APIs Implemented
 
-Run migrations and start the server:
-
-```bash
-make migrations
-make run
+```
+api/v1/access/token [name='get_mpesa_access_token']
+api/v1/online/lipa [name='lipa_na_mpesa']
+api/v1/c2b/register [name='register_mpesa_validation']
+api/v1/c2b/confirmation[name='confirmation']
+api/v1/c2b/validation [name='validation']
+api/v1/stk/callback [name='stk_callback']
+api/v1/stk/error [name='stk_error']
+api/v1/transactions/all [name='get_all_transactions']
+api/v1/transactions/completed [name='get_completed_transactions']
 ```
 
-Manual equivalent:
+Usage:
 
-```bash
+1. Make Migrations:
+
+```
+python manage.py makemigrations
 python manage.py migrate
-python manage.py runserver 8000
 ```
 
-## Configuration (.env)
+2. Create Super User:
 
-All configuration is read from `.env` (loaded via `python-dotenv`). Use `.env.example` as a template.
-
-Key variables:
-
-- `CONSUMER_KEY`, `CONSUMER_SECRET`, `TOKEN_URL`
-- `LIPA_NA_MPESA_ONLINE_URL` (STK push endpoint)
-- `REGISTER_URL` (C2B register URL endpoint)
-- `BUSINESS_SHORTCODE` and `LIPA_NA_MPESA_PASSKEY` (STK password generation)
-- `C2B_SHORTCODE` (for C2B URL registration; sandbox commonly uses `600000`)
-- `STK_CALLBACK_URL`, `CONFIRMATION_URL`, `VALIDATION_URL`
-
-## Security
-
-### Internal API Key
-
-The following endpoints are protected and require an API key header:
-
-- `GET /api/v1/access/token`
-- `POST /api/v1/online/lipa`
-- `POST /api/v1/c2b/register`
-- `GET /api/v1/transactions/all`
-- `GET /api/v1/transactions/completed`
-
-Send the key using either:
-
-- `X-API-Key: <your key>` (recommended)
-- or `Authorization: Bearer <your key>`
-
-Callback endpoints are intentionally **not** protected by this key (Safaricom must call them).
-
-### Rate Limiting
-
-Protected endpoints are rate-limited per IP (see `INTERNAL_RATE_LIMIT_*` in `.env.example`).
-
-## Ngrok (Local Callback Testing)
-
-Safaricom needs a public HTTPS URL to reach your callbacks. This repo includes `ngrok.py` to tunnel your local Django server.
-
-1. Start Django:
-
-```bash
-make run
+```
+python manage.py createsuperuser
 ```
 
-Manual equivalent:
+3. Run Server:
 
-```bash
-python manage.py runserver 8000
+```
+python manage.py runserver
 ```
 
-2. Start ngrok:
+4. Example API Call:
 
-```bash
-python ngrok.py
+```
+http://127.0.0.1:8000/api/v1/online/lipa
 ```
 
-3. Update `.env` to use the ngrok domain:
+- `This will send a push notification to the registered phone number.`
 
-- `STK_CALLBACK_URL=https://<ngrok-host>/api/v1/stk/callback`
-- `CONFIRMATION_URL=https://<ngrok-host>/api/v1/c2b/confirmation`
-- `VALIDATION_URL=https://<ngrok-host>/api/v1/c2b/validation`
-- Add the host to `DJANGO_ALLOWED_HOSTS` (host only, no scheme), e.g. `abcd.ngrok-free.app`
-
-After updating `.env`, restart Django.
-
-## Endpoints
-
-```text
-GET  /api/v1/access/token
-POST /api/v1/online/lipa
-POST /api/v1/c2b/register
-POST /api/v1/c2b/confirmation
-POST /api/v1/c2b/validation
-POST /api/v1/stk/callback
-POST /api/v1/stk/error
-GET  /api/v1/transactions/all
-GET  /api/v1/transactions/completed
-```
-
-## Usage Guide
-
-See `USAGE.md` for:
-
-- Generating an API key
-- Sample curl requests
-- ngrok workflow tips and troubleshooting
-
-## Tests
-
-Run the test suite:
-
-```bash
-python manage.py test
-```
-
-## Author
-
-Emmanuel Chalo  
-[LinkedIn](https://www.linkedin.com/in/emmanuel-chalo-211336183)  
+Author: Emmanuel Chalo<br/>
+[LinkedIn](https://www.linkedin.com/in/emmanuel-chalo-211336183)<br/>
 [email](mailto:emusyoka759@gmail.com)

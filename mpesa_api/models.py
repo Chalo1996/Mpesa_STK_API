@@ -14,7 +14,7 @@ class MpesaCalls(BaseModel):
     """Stores all M-Pesa API call logs"""
     ip_address = models.GenericIPAddressField()
     caller = models.TextField()
-    conversation_id = models.TextField(blank=True, null=True, db_index=True)
+    conversation_id = models.TextField(unique=True)
     content = models.TextField()
 
     class Meta:

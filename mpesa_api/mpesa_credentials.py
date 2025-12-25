@@ -1,4 +1,5 @@
 import requests
+import json
 from requests.auth import HTTPBasicAuth
 from datetime import datetime
 import base64
@@ -17,19 +18,11 @@ class MpesaC2bCredential:
     @staticmethod
     def get_access_token():
         """Fetches and returns the Mpesa access token"""
-        if not MpesaC2bCredential.TOKEN_URL:
-            return None
-        if not MpesaC2bCredential.CONSUMER_KEY or not MpesaC2bCredential.CONSUMER_SECRET:
-            return None
         response = requests.get(
             MpesaC2bCredential.TOKEN_URL,
-            auth=HTTPBasicAuth(MpesaC2bCredential.CONSUMER_KEY, MpesaC2bCredential.CONSUMER_SECRET),
-            timeout=30,
+            auth=HTTPBasicAuth(MpesaC2bCredential.CONSUMER_KEY, MpesaC2bCredential.CONSUMER_SECRET)
         )
-        try:
-            response_data = response.json()
-        except Exception:
-            return None
+        response_data = response.json()
         return response_data.get('access_token')
 
 
@@ -42,8 +35,6 @@ class LipanaMpesaPassword:
     def generate_password():
         """Generates Base64 encoded password"""
         lipa_time = datetime.now().strftime('%Y%m%d%H%M%S')
-        if not LipanaMpesaPassword.BUSINESS_SHORT_CODE or not LipanaMpesaPassword.PASSKEY:
-            raise ValueError("BUSINESS_SHORTCODE and LIPA_NA_MPESA_PASSKEY must be set")
         data_to_encode = LipanaMpesaPassword.BUSINESS_SHORT_CODE + LipanaMpesaPassword.PASSKEY + lipa_time
         encoded_password = base64.b64encode(data_to_encode.encode()).decode('utf-8')
         return encoded_password, lipa_time
