@@ -30,7 +30,10 @@ export function StkPushPage() {
     };
   }, []);
 
-  async function pollForCallback(conversationId: string, timeoutMs = 60_000) {
+  async function pollForTransaction(
+    ids: { merchantRequestId?: string; checkoutRequestId?: string },
+    timeoutMs = 60_000
+  ) {
     setWaitingForCallback(true);
     const startedAt = Date.now();
 
@@ -43,23 +46,31 @@ export function StkPushPage() {
         return;
       }
 
-      const res = await apiRequest(`/api/v1/admin/logs/callbacks?limit=200`, {
+      const res = await apiRequest(`/api/v1/transactions/all`, {
         method: "GET",
       });
 
       if (!(res.status >= 200 && res.status < 300)) {
-        // If we can't read logs (not staff / not logged in), stop polling.
+        // If we can't read transactions (not logged in / not authorized), stop polling.
         clearPoll();
         setWaitingForCallback(false);
         return;
       }
 
-      const rows: any[] = Array.isArray(res.data?.results)
-        ? res.data.results
+      const rows: any[] = Array.isArray(res.data?.transactions)
+        ? res.data.transactions
         : [];
+
+      const merchantRequestId = (ids.merchantRequestId || "").trim();
+      const checkoutRequestId = (ids.checkoutRequestId || "").trim();
       const matched = rows.find((r) => {
-        const cid = String(r?.conversation_id ?? "");
-        return cid && cid === conversationId;
+        const rowMerchantRequestId = String(r?.merchant_request_id ?? "");
+        const rowCheckoutRequestId = String(r?.checkout_request_id ?? "");
+        if (merchantRequestId && rowMerchantRequestId === merchantRequestId)
+          return true;
+        if (checkoutRequestId && rowCheckoutRequestId === checkoutRequestId)
+          return true;
+        return false;
       });
 
       if (matched) {
@@ -98,17 +109,28 @@ export function StkPushPage() {
       setStatus(result.status);
       setData(result.data);
 
-      // If this looks like a successful STK push initiation, start polling
-      // for the callback and then redirect to Transactions.
-      const conversationId =
+      // If this looks like a successful STK push initiation, poll transactions
+      // until the callback has been persisted, then redirect to Transactions.
+      const merchantRequestId =
         result.data?.MerchantRequestID || result.data?.merchant_request_id;
+      const checkoutRequestId =
+        result.data?.CheckoutRequestID || result.data?.checkout_request_id;
       if (
         result.status >= 200 &&
         result.status < 300 &&
-        typeof conversationId === "string" &&
-        conversationId
+        ((typeof merchantRequestId === "string" && merchantRequestId) ||
+          (typeof checkoutRequestId === "string" && checkoutRequestId))
       ) {
-        await pollForCallback(conversationId);
+        await pollForTransaction({
+          merchantRequestId:
+            typeof merchantRequestId === "string"
+              ? merchantRequestId
+              : undefined,
+          checkoutRequestId:
+            typeof checkoutRequestId === "string"
+              ? checkoutRequestId
+              : undefined,
+        });
       }
     } finally {
       setLoading(false);
