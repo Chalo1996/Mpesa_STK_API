@@ -54,6 +54,7 @@ INTERNAL_RATE_LIMIT_PATHS = _env_csv(
         "/api/v1/b2b/bulk",
         "/api/v1/qr/generate",
         "/api/v1/ratiba/create",
+        "/api/v1/oauth/token/",
     ],
 )
 
@@ -89,6 +90,8 @@ INSTALLED_APPS = [
     'b2b_api',
     'qr_api',
     'ratiba_api',
+    'oauth2_provider',
+    'maintainer_api',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -219,3 +222,26 @@ if not DEBUG:
     SESSION_COOKIE_SECURE = _env_bool("SESSION_COOKIE_SECURE", default=True)
     CSRF_COOKIE_SECURE = _env_bool("CSRF_COOKIE_SECURE", default=True)
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+
+# OAuth2 (client_credentials) for third-party integrators.
+#
+# Token endpoint: /api/v1/oauth/token/
+#
+# Scopes are intentionally simple to start; you can add finer-grained scopes later.
+OAUTH2_PROVIDER = {
+    # 8 hours default; tune as needed.
+    "ACCESS_TOKEN_EXPIRE_SECONDS": int(os.getenv("OAUTH2_ACCESS_TOKEN_EXPIRE_SECONDS", str(60 * 60 * 8))),
+    "SCOPES": {
+        "gateway": "Access the Mobile Money API gateway (legacy umbrella scope)",
+        "transactions:read": "Read transactions",
+        "c2b:write": "Initiate C2B / STK operations",
+        "qr:write": "Generate QR codes",
+        "ratiba:write": "Create Ratiba standing orders",
+        "b2c:write": "Create B2C bulk payout batches",
+        "b2b:write": "Create B2B bulk payment batches",
+        "maintainer": "Manage OAuth clients (maintainer-only)",
+    },
+    # Force clients to request explicit scopes.
+    "DEFAULT_SCOPES": [],
+}

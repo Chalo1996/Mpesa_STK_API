@@ -8,7 +8,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 from mpesa_api.models import MpesaCalls
 from mpesa_api.mpesa_credentials import MpesaC2bCredential
-from services_common.auth import require_internal_api_key
+from services_common.auth import require_oauth2, require_staff
 from services_common.http import json_body
 
 from .models import QrCode
@@ -42,7 +42,7 @@ def _serialize_qr(record: QrCode, include_payloads: bool = False):
     return data
 
 
-@require_internal_api_key
+@require_oauth2(scopes=["qr:write"])
 @csrf_exempt
 def generate_qr(request):
     """Generate an M-Pesa QR code via Daraja QR API.
@@ -168,7 +168,7 @@ def generate_qr(request):
     return JsonResponse(data, status=resp.status_code)
 
 
-@require_internal_api_key
+@require_staff
 def qr_history(request):
     if request.method != "GET":
         return JsonResponse({"error": "Method not allowed"}, status=405)
@@ -177,7 +177,7 @@ def qr_history(request):
     return JsonResponse({"results": [_serialize_qr(r) for r in items]}, status=200)
 
 
-@require_internal_api_key
+@require_staff
 def qr_detail(request, qr_id):
     if request.method != "GET":
         return JsonResponse({"error": "Method not allowed"}, status=405)

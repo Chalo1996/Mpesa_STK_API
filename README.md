@@ -11,8 +11,11 @@ This project is a Django + Django REST Framework API that demonstrates Mobile Mo
 The codebase is organized in a service-oriented way:
 
 - **C2B** (STK Push + C2B callbacks) — existing service
-- **B2C** (bulk payouts) — to be added
-- **B2B** (bulk business payments) — to be added
+- **B2C** (bulk payouts) — available (bulk create)
+- **B2B** (bulk business payments) — available (bulk create)
+- **QR** (Daraja QR generation) — available
+- **Ratiba** (standing orders) — available
+- **Maintainer** (OAuth client management) — available
 
 The API is designed for local development and sandbox testing. It supports using **ngrok** so Safaricom can reach your local callback endpoints.
 
@@ -77,24 +80,41 @@ Key variables:
 
 ## Security
 
-### Internal API Key
+### OAuth2 (Third-Party Gateway)
 
-The following endpoints are protected and require an API key header:
+Third-party developers should use **OAuth2 client_credentials** and call protected endpoints with:
 
-- `GET /api/v1/access/token`
-- `POST /api/v1/online/lipa`
-- `POST /api/v1/c2b/register`
-- `GET /api/v1/transactions/all`
-- `GET /api/v1/transactions/completed`
+- `Authorization: Bearer <access_token>`
 
-Send the key using either:
+Token endpoint:
 
-- `X-API-Key: <your key>` (recommended)
-- or `Authorization: Bearer <your key>`
+- `POST /api/v1/oauth/token/`
 
-If you are logged in as a **Django staff user** (session auth), these protected endpoints are also allowed for the dashboard.
+Scopes (space-separated):
 
-Callback endpoints are intentionally **not** protected by this key (Safaricom must call them).
+- `transactions:read`
+- `c2b:write`
+- `qr:write`
+- `ratiba:write`
+- `b2c:write`
+- `b2b:write`
+
+Protected “gateway” endpoints require an OAuth2 token with the appropriate scope.
+
+### Staff Session (Dashboard)
+
+The React dashboard can also operate many endpoints via **Django staff session auth**.
+
+Staff-only endpoints include:
+
+- `GET /api/v1/access/token` (Safaricom token helper)
+- `POST /api/v1/c2b/register` (register callback URLs)
+- `GET /api/v1/qr/history` and `GET /api/v1/qr/<id>`
+- `GET /api/v1/ratiba/history` and `GET /api/v1/ratiba/<id>`
+- `GET /api/v1/b2b/bulk` and `GET /api/v1/b2b/bulk/<batch_id>`
+- `GET /api/v1/b2c/bulk` and `GET /api/v1/b2c/bulk/<batch_id>`
+
+Callback endpoints are intentionally **not** authenticated (Safaricom must call them).
 
 ### Rate Limiting
 
@@ -139,9 +159,9 @@ GET  /api/v1/auth/me
 POST /api/v1/auth/login
 POST /api/v1/auth/logout
 
-GET  /api/v1/access/token
-POST /api/v1/online/lipa
-POST /api/v1/c2b/register
+GET  /api/v1/access/token               # staff-only (session)
+POST /api/v1/online/lipa                # legacy alias of /api/v1/c2b/stk/push
+POST /api/v1/c2b/register               # staff-only (session)
 POST /api/v1/c2b/confirmation
 POST /api/v1/c2b/validation
 POST /api/v1/stk/callback
@@ -149,12 +169,15 @@ POST /api/v1/stk/error
 GET  /api/v1/transactions/all
 GET  /api/v1/transactions/completed
 
+# OAuth2 (third-party gateway)
+POST /api/v1/oauth/token/
+
 GET  /api/v1/admin/logs/calls
 GET  /api/v1/admin/logs/callbacks
 GET  /api/v1/admin/logs/stk-errors
 
 # Service-style prefixes (aliases / new services)
-POST /api/v1/c2b/stk/push
+POST /api/v1/c2b/stk/push               # recommended STK push endpoint
 POST /api/v1/c2b/stk/callback
 POST /api/v1/c2b/stk/error
 POST /api/v1/c2b/register
@@ -172,13 +195,25 @@ GET  /api/v1/b2b/bulk
 GET  /api/v1/b2b/bulk/<batch_id>
 
 POST /api/v1/qr/generate
+GET  /api/v1/qr/history
+GET  /api/v1/qr/<qr_id>
+
+POST /api/v1/ratiba/create
+GET  /api/v1/ratiba/history
+GET  /api/v1/ratiba/<order_id>
+
+# Maintainer (superuser)
+GET  /api/v1/maintainer/clients
+POST /api/v1/maintainer/clients
+POST /api/v1/maintainer/clients/<client_id>/rotate-secret
+POST /api/v1/maintainer/clients/<client_id>/revoke
 ```
 
 ## Usage Guide
 
 See `USAGE.md` for:
 
-- Generating an API key
+- Getting an OAuth2 access token (client_credentials) and scopes
 - Sample curl requests
 - ngrok workflow tips and troubleshooting
 

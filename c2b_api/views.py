@@ -16,11 +16,11 @@ from requests.auth import HTTPBasicAuth
 
 from mpesa_api.models import MpesaCallBacks, MpesaCalls, MpesaPayment
 from mpesa_api.mpesa_credentials import LipanaMpesaPassword, MpesaC2bCredential
-from services_common.auth import require_internal_api_key
+from services_common.auth import require_oauth2, require_staff
 from services_common.http import json_body, parse_mpesa_timestamp
 
 
-@require_internal_api_key
+@require_staff
 def get_access_token(request):
     if request.method != "GET":
         return JsonResponse({"error": "Method not allowed"}, status=405)
@@ -45,7 +45,7 @@ def get_access_token(request):
 
 
 @csrf_exempt
-@require_internal_api_key
+@require_oauth2(scopes=["c2b:write"])
 def stk_push(request):
     """Initiates Lipa Na Mpesa Online Payment (STK Push)."""
     if request.method != "POST":
@@ -100,7 +100,7 @@ def stk_push(request):
 
 
 @csrf_exempt
-@require_internal_api_key
+@require_staff
 def register_urls(request):
     """Registers Mpesa Confirmation and Validation URLs."""
     if request.method != "POST":
@@ -265,7 +265,7 @@ def stk_error(request):
         return JsonResponse({"error": str(e)}, status=500)
 
 
-@require_internal_api_key(message="Please sign in with a staff account to view transactions.")
+@require_oauth2(scopes=["transactions:read"], message="Please sign in with a staff account to view transactions.")
 def transactions_completed(request):
     """Fetch completed M-Pesa transactions with optional filters."""
     if request.method != "GET":
@@ -297,7 +297,7 @@ def transactions_completed(request):
         return JsonResponse({"error": str(e)}, status=500)
 
 
-@require_internal_api_key(message="Please sign in with a staff account to view transactions.")
+@require_oauth2(scopes=["transactions:read"], message="Please sign in with a staff account to view transactions.")
 def transactions_all(request):
     """Fetch all M-Pesa transactions."""
     if request.method != "GET":

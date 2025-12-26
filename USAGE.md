@@ -37,28 +37,45 @@ If you see CSRF errors, add this to `.env`:
 DJANGO_CSRF_TRUSTED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 ```
 
-## 1) Create an API key
+## API gateway auth (OAuth2)
 
-The API uses an internal API key to protect non-callback endpoints.
+Third-party access is OAuth2-only.
 
-Note: this API key is mainly for calling the API directly (curl/Postman). The dashboard uses session auth.
+To call protected endpoints from curl/Postman, you need:
 
-Generate a strong key:
+- `client_id`
+- `client_secret`
+- requested scopes (space-separated)
+
+You can create OAuth clients using the Maintainer page in the dashboard (superuser-only).
+
+### Get an OAuth2 access token (client_credentials)
+
+Request an access token:
 
 ```bash
-python -c "import secrets; print(secrets.token_urlsafe(32))"
+curl -X POST http://127.0.0.1:8000/api/v1/oauth/token/ \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=client_credentials" \
+  -d "client_id=<CLIENT_ID>" \
+  -d "client_secret=<CLIENT_SECRET>" \
+  -d "scope=transactions:read c2b:write qr:write ratiba:write b2c:write b2b:write"
 ```
 
-Set it in your `.env`:
+Use the returned token for API calls:
 
-```dotenv
-INTERNAL_API_KEY=<paste-generated-key>
+```bash
+export ACCESS_TOKEN='<paste access_token here>'
 ```
 
-Send it with requests:
+Scope mapping (high level):
 
-- `X-API-Key: <your key>` (recommended)
-- or `Authorization: Bearer <your key>`
+- STK push: `c2b:write`
+- Transactions: `transactions:read`
+- QR generate: `qr:write`
+- Ratiba create: `ratiba:write`
+- B2C bulk create: `b2c:write`
+- B2B bulk create: `b2b:write`
 
 ## 2) Start the app
 
@@ -120,9 +137,24 @@ Restart Django after editing `.env`.
 
 This calls _your local API_, which then calls Safaricom’s C2B register endpoint.
 
+This endpoint is **staff-only** (session auth). The easiest way is to log into the dashboard and use the UI.
+
+If you want to do it with curl, do a session login first (CSRF + cookie jar), then call the register endpoint:
+
+```bash
+csrf=$(curl -s -c cookies.txt http://127.0.0.1:8000/api/v1/auth/csrf | python -c 'import sys,json; print(json.load(sys.stdin)["csrfToken"])')
+
+curl -s -b cookies.txt -c cookies.txt \
+  -X POST http://127.0.0.1:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -H "X-CSRFToken: $csrf" \
+  -H "Referer: http://127.0.0.1:8000" \
+  -d '{"username":"<STAFF_USERNAME>","password":"<STAFF_PASSWORD>"}'
+```
+
 ```bash
 curl -X POST http://127.0.0.1:8000/api/v1/c2b/register \
-  -H "X-API-Key: <your INTERNAL_API_KEY>"
+  -b cookies.txt -c cookies.txt
 ```
 
 Notes:
@@ -135,8 +167,8 @@ Notes:
 Minimal request:
 
 ```bash
-curl -X POST http://127.0.0.1:8000/api/v1/online/lipa \
-  -H "X-API-Key: <your INTERNAL_API_KEY>" \
+curl -X POST http://127.0.0.1:8000/api/v1/c2b/stk/push \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"amount": 1, "phone_number": "2547XXXXXXXX"}'
 ```
@@ -144,8 +176,8 @@ curl -X POST http://127.0.0.1:8000/api/v1/online/lipa \
 If you see `Bad Request - Invalid PartyA`, set `PARTY_A` in `.env` or pass it explicitly:
 
 ```bash
-curl -X POST http://127.0.0.1:8000/api/v1/online/lipa \
-  -H "X-API-Key: <your INTERNAL_API_KEY>" \
+curl -X POST http://127.0.0.1:8000/api/v1/c2b/stk/push \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"amount": 1, "phone_number": "2547XXXXXXXX", "party_a": "2547XXXXXXXX"}'
 ```
@@ -164,14 +196,65 @@ All transactions:
 
 ```bash
 curl -X GET http://127.0.0.1:8000/api/v1/transactions/all \
-  -H "X-API-Key: <your INTERNAL_API_KEY>"
+  -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
 Completed transactions:
 
 ```bash
 curl -X GET http://127.0.0.1:8000/api/v1/transactions/completed \
-  -H "X-API-Key: <your INTERNAL_API_KEY>"
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+## 6b) Generate a QR Code
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/qr/generate \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"MerchantName":"My Shop","RefNo":"INV-001","Amount":1,"TrxCode":"BG"}'
+```
+
+## 6c) Create a Ratiba Standing Order
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/ratiba/create \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "StandingOrderName":"Test Standing Order",
+    "StartDate":"20240905",
+    "EndDate":"20250905",
+    "BusinessShortCode":"174379",
+    "TransactionType":"Standing Order Customer Pay Bill",
+    "ReceiverPartyIdentifierType":"4",
+    "Amount":"4500",
+    "PartyA":"254708374149",
+    "CallBackURL":"https://example.invalid/pat",
+    "AccountReference":"Test",
+    "TransactionDesc":"Test",
+    "Frequency":"2"
+  }'
+```
+
+## 6d) Create B2C/B2B bulk batches
+
+B2C:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/b2c/bulk \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"reference":"BATCH-001","items":[{"recipient":"254700000000","amount":"1"}]}'
+```
+
+B2B:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/b2b/bulk \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"reference":"B2B-001","items":[{"recipient":"ACCT-001","amount":"1"}]}'
 ```
 
 ## 7) Quick callback sanity checks (via ngrok)

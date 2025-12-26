@@ -26,7 +26,10 @@ urlpatterns = [
     path('qr/', include('qr_api.urls')),
     path('ratiba/', include('ratiba_api.urls')),
 
-    # Admin-only (API key protected) log endpoints
+    # Maintainer (superuser) dashboard APIs
+    path('maintainer/', include('maintainer_api.urls')),
+
+    # Admin-only (staff session) log endpoints
     path('admin/logs/calls', views.admin_calls_log, name="admin_calls_log"),
     path('admin/logs/callbacks', views.admin_callbacks_log, name="admin_callbacks_log"),
     path('admin/logs/stk-errors', views.admin_stk_errors_log, name="admin_stk_errors_log"),

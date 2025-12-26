@@ -4,7 +4,7 @@ from decimal import Decimal, InvalidOperation
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
-from services_common.auth import require_internal_api_key
+from services_common.auth import require_oauth2, require_staff
 
 from .models import BulkPayoutBatch, BulkPayoutItem
 
@@ -42,7 +42,7 @@ def _serialize_item(item: BulkPayoutItem):
     }
 
 
-@require_internal_api_key
+@require_oauth2(scopes=["b2c:write"])
 @csrf_exempt
 def bulk_create(request):
     if request.method != "POST":
@@ -97,7 +97,7 @@ def bulk_create(request):
     )
 
 
-@require_internal_api_key
+@require_staff
 def bulk_list(request):
     if request.method != "GET":
         return JsonResponse({"error": "Method not allowed"}, status=405)
@@ -112,7 +112,7 @@ def bulk_list(request):
     return JsonResponse({"results": [_serialize_batch(b) for b in qs]})
 
 
-@require_internal_api_key
+@require_staff
 def bulk_detail(request, batch_id):
     if request.method != "GET":
         return JsonResponse({"error": "Method not allowed"}, status=405)

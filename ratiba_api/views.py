@@ -7,7 +7,7 @@ from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 
 from mpesa_api.mpesa_credentials import MpesaC2bCredential
-from services_common.auth import require_internal_api_key
+from services_common.auth import require_oauth2, require_staff
 from services_common.http import json_body
 
 from .models import RatibaOrder
@@ -91,7 +91,7 @@ def _validate_ratiba_payload(payload: dict) -> str | None:
     return None
 
 
-@require_internal_api_key
+@require_oauth2(scopes=["ratiba:write"])
 @csrf_exempt
 def create_ratiba(request):
     """Create an M-Pesa Ratiba standing order via Daraja.
@@ -151,7 +151,7 @@ def create_ratiba(request):
     return JsonResponse(data, status=resp.status_code)
 
 
-@require_internal_api_key
+@require_staff
 def ratiba_history(request):
     if request.method != "GET":
         return JsonResponse({"error": "Method not allowed"}, status=405)
@@ -160,7 +160,7 @@ def ratiba_history(request):
     return JsonResponse({"results": [_serialize_order(i) for i in items]}, status=200)
 
 
-@require_internal_api_key
+@require_staff
 def ratiba_detail(request, order_id):
     if request.method != "GET":
         return JsonResponse({"error": "Method not allowed"}, status=405)

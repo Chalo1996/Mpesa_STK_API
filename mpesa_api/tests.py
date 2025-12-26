@@ -1,9 +1,13 @@
 import json
 import os
+from datetime import timedelta
 
 from django.core.cache import cache
 from django.contrib.auth import get_user_model
 from django.test import Client, RequestFactory, TestCase, override_settings
+from django.utils import timezone
+
+from oauth2_provider.models import AccessToken, Application
 
 from .models import MpesaCallBacks, MpesaCalls, MpesaPayment
 from .views import (
@@ -94,17 +98,43 @@ class MpesaViewsTests(TestCase):
 class InternalAuthTests(TestCase):
 	def setUp(self):
 		self.factory = RequestFactory()
-		os.environ["INTERNAL_API_KEY"] = "test-key"
+		self.access_token = self._create_access_token(scope="transactions:read")
 
-	def test_get_access_token_requires_api_key(self):
+	def _create_access_token(self, scope: str) -> str:
+		User = get_user_model()
+		user = User.objects.create_user(username="oauth-owner", password="pw")
+		app = Application.objects.create(
+			name="test-app",
+			user=user,
+			client_type=Application.CLIENT_CONFIDENTIAL,
+			authorization_grant_type=Application.GRANT_CLIENT_CREDENTIALS,
+		)
+		token = "test-transactions-token"
+		AccessToken.objects.create(
+			user=user,
+			application=app,
+			token=token,
+			scope=scope,
+			expires=timezone.now() + timedelta(hours=1),
+		)
+		return token
+
+	def test_get_access_token_requires_staff_session(self):
 		request = self.factory.get("/api/v1/access/token")
 		response = get_access_token(request)
 		self.assertEqual(response.status_code, 401)
 
-	def test_transactions_requires_api_key(self):
+	def test_transactions_requires_bearer_token(self):
 		request = self.factory.get("/api/v1/transactions/all")
 		response = all_transactions(request)
 		self.assertEqual(response.status_code, 401)
+
+		request2 = self.factory.get(
+			"/api/v1/transactions/all",
+			HTTP_AUTHORIZATION=f"Bearer {self.access_token}",
+		)
+		response2 = all_transactions(request2)
+		self.assertEqual(response2.status_code, 200)
 
 	def test_admin_calls_log_requires_api_key(self):
 		request = self.factory.get("/api/v1/admin/logs/calls")
@@ -207,7 +237,26 @@ class SessionAuthCsrfTests(TestCase):
 class RateLimitMiddlewareTests(TestCase):
 	def setUp(self):
 		cache.clear()
-		os.environ["INTERNAL_API_KEY"] = "test-key"
+		self.access_token = self._create_access_token(scope="transactions:read")
+
+	def _create_access_token(self, scope: str) -> str:
+		User = get_user_model()
+		user = User.objects.create_user(username="oauth-owner", password="pw")
+		app = Application.objects.create(
+			name="test-app",
+			user=user,
+			client_type=Application.CLIENT_CONFIDENTIAL,
+			authorization_grant_type=Application.GRANT_CLIENT_CREDENTIALS,
+		)
+		token = "test-rl-token"
+		AccessToken.objects.create(
+			user=user,
+			application=app,
+			token=token,
+			scope=scope,
+			expires=timezone.now() + timedelta(hours=1),
+		)
+		return token
 
 	@override_settings(
 		INTERNAL_RATE_LIMIT_ENABLED=True,
@@ -217,7 +266,7 @@ class RateLimitMiddlewareTests(TestCase):
 	)
 	def test_rate_limit_trips_on_protected_endpoint(self):
 		# Use Django test client so middleware is applied.
-		headers = {"HTTP_X_API_KEY": "test-key"}
+		headers = {"HTTP_AUTHORIZATION": f"Bearer {self.access_token}"}
 		r1 = self.client.get("/api/v1/transactions/all", **headers)
 		r2 = self.client.get("/api/v1/transactions/all", **headers)
 		r3 = self.client.get("/api/v1/transactions/all", **headers)

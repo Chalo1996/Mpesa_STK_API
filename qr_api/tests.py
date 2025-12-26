@@ -1,18 +1,42 @@
 import json
 import os
+from datetime import timedelta
 from unittest.mock import patch
 
+from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.utils import timezone
+
+from oauth2_provider.models import AccessToken, Application
 
 from .models import QrCode
 
 
 class QrApiTests(TestCase):
     def setUp(self):
-        os.environ["INTERNAL_API_KEY"] = "test-key"
         os.environ["MPESA_QR_CODE_URL"] = "https://example.invalid/mpesa/qrcode"
+        self.access_token = self._create_access_token(scope="qr:write")
 
-    def test_generate_requires_api_key(self):
+    def _create_access_token(self, scope: str) -> str:
+        User = get_user_model()
+        user = User.objects.create_user(username="oauth-owner", password="pw")
+        app = Application.objects.create(
+            name="test-app",
+            user=user,
+            client_type=Application.CLIENT_CONFIDENTIAL,
+            authorization_grant_type=Application.GRANT_CLIENT_CREDENTIALS,
+        )
+        token = "test-qr-token"
+        AccessToken.objects.create(
+            user=user,
+            application=app,
+            token=token,
+            scope=scope,
+            expires=timezone.now() + timedelta(hours=1),
+        )
+        return token
+
+    def test_generate_requires_bearer_token(self):
         resp = self.client.post(
             "/api/v1/qr/generate",
             data=json.dumps({"MerchantName": "X", "RefNo": "1", "Amount": 1, "TrxCode": "BG"}),
@@ -38,7 +62,7 @@ class QrApiTests(TestCase):
                 }
             ),
             content_type="application/json",
-            HTTP_X_API_KEY="test-key",
+            HTTP_AUTHORIZATION=f"Bearer {self.access_token}",
         )
 
         self.assertEqual(resp.status_code, 200)
@@ -55,7 +79,7 @@ class QrApiTests(TestCase):
         self.assertIn("headers", kwargs)
         self.assertEqual(kwargs["headers"].get("Authorization"), "Bearer token")
 
-    def test_history_requires_api_key(self):
+    def test_history_requires_staff_session(self):
         resp = self.client.get("/api/v1/qr/history")
         self.assertEqual(resp.status_code, 401)
 
@@ -70,7 +94,14 @@ class QrApiTests(TestCase):
             response_payload={"QRCode": "X"},
             qr_code_base64="X",
         )
-        resp = self.client.get("/api/v1/qr/history", HTTP_X_API_KEY="test-key")
+
+        User = get_user_model()
+        staff = User.objects.create_user(username="staff", password="pw")
+        staff.is_staff = True
+        staff.save()
+        self.client.force_login(staff)
+
+        resp = self.client.get("/api/v1/qr/history")
         self.assertEqual(resp.status_code, 200)
         payload = resp.json()
         self.assertIn("results", payload)
