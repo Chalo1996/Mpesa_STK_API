@@ -63,6 +63,22 @@ python manage.py migrate
 python manage.py runserver 8000
 ```
 
+## Bootstrap Superuser (UI-Friendly)
+
+In production you typically need a way to create the _first_ admin account.
+
+This repo supports a guarded bootstrap endpoint + SPA page:
+
+- Set `BOOTSTRAP_SUPERUSER_TOKEN` in the server environment.
+- Open the dashboard route `/bootstrap/superuser` and submit:
+  - the same bootstrap token
+  - username + password (+ optional email)
+
+Security notes:
+
+- The endpoint only works when **no superuser exists**.
+- If `BOOTSTRAP_SUPERUSER_TOKEN` is not set, the endpoint is disabled.
+
 ## Configuration (.env)
 
 All configuration is read from `.env` (loaded via `python-dotenv`). Use `.env.example` as a template.
@@ -77,6 +93,12 @@ Key variables:
 - `STK_CALLBACK_URL`, `CONFIRMATION_URL`, `VALIDATION_URL`
 - `MPESA_QR_CODE_URL` (M-Pesa QR code generation endpoint)
 - `MPESA_RATIBA_URL` (M-Pesa Ratiba standing order endpoint)
+
+Note on credentials provisioning:
+
+- This project can **store and use** per-business Daraja credentials/shortcodes, but it cannot create Safaricom consumer keys/secrets/passkeys for you.
+- Merchants must create/obtain credentials in the Safaricom Daraja portal, then configure them in the maintainer onboarding UI.
+- Safaricom Daraja portal: <https://developer.safaricom.co.ke/>
 
 ## Security
 
@@ -136,13 +158,13 @@ Manual equivalent:
 python manage.py runserver 8000
 ```
 
-2. Start ngrok:
+1. Start ngrok:
 
 ```bash
 python ngrok.py
 ```
 
-3. Update `.env` to use the ngrok domain:
+1. Update `.env` to use the ngrok domain:
 
 - `STK_CALLBACK_URL=https://<ngrok-host>/api/v1/stk/callback`
 - `CONFIRMATION_URL=https://<ngrok-host>/api/v1/c2b/confirmation`
@@ -158,6 +180,8 @@ GET  /api/v1/auth/csrf
 GET  /api/v1/auth/me
 POST /api/v1/auth/login
 POST /api/v1/auth/logout
+
+POST /api/v1/bootstrap/superuser        # guarded; first-superuser bootstrap only
 
 GET  /api/v1/access/token               # staff-only (session)
 POST /api/v1/online/lipa                # legacy alias of /api/v1/c2b/stk/push
@@ -199,6 +223,7 @@ GET  /api/v1/qr/history
 GET  /api/v1/qr/<qr_id>
 
 POST /api/v1/ratiba/create
+POST /api/v1/ratiba/callback
 GET  /api/v1/ratiba/history
 GET  /api/v1/ratiba/<order_id>
 
@@ -237,13 +262,13 @@ The dashboard uses **Django session auth** (staff-only) rather than a shared API
 make run
 ```
 
-2. Create a Django admin user (staff):
+1. Create a Django admin user (staff):
 
 ```bash
 make superuser
 ```
 
-3. Start the dashboard (port 5173):
+1. Start the dashboard (port 5173):
 
 ```bash
 cd frontend

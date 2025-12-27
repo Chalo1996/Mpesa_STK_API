@@ -10,6 +10,9 @@ urlpatterns = [
     path('auth/login', views.auth_login, name='auth_login'),
     path('auth/logout', views.auth_logout, name='auth_logout'),
 
+    # Bootstrap: create the first superuser (guarded by BOOTSTRAP_SUPERUSER_TOKEN)
+    path('bootstrap/superuser', views.bootstrap_superuser, name='bootstrap_superuser'),
+
     path('access/token', views.get_access_token, name='get_mpesa_access_token'),
     path('online/lipa', views.lipa_na_mpesa_online, name='lipa_na_mpesa'),
 

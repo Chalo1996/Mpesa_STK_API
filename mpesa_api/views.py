@@ -1,4 +1,6 @@
-from django.contrib.auth import authenticate, login, logout
+import os
+
+from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.http import JsonResponse
 from django.middleware.csrf import get_token
 from django.views.decorators.csrf import csrf_exempt, csrf_protect, ensure_csrf_cookie
@@ -51,6 +53,55 @@ def all_transactions(request):
     from c2b_api import views as c2b
 
     return c2b.transactions_all(request)
+
+
+@csrf_exempt
+def bootstrap_superuser(request):
+    """Create the first Django superuser via a guarded bootstrap endpoint.
+
+    Security properties:
+    - Requires `BOOTSTRAP_SUPERUSER_TOKEN` to be set in the environment.
+    - Requires request header `X-Bootstrap-Token` to match that token.
+    - Only works when no superuser exists yet.
+    """
+
+    if request.method != "POST":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+
+    required = (os.getenv("BOOTSTRAP_SUPERUSER_TOKEN") or "").strip()
+    if not required:
+        return JsonResponse({"error": "Bootstrap disabled"}, status=403)
+
+    provided = (request.headers.get("X-Bootstrap-Token") or "").strip()
+    if not provided:
+        return JsonResponse({"error": "Missing bootstrap token"}, status=401)
+    if provided != required:
+        return JsonResponse({"error": "Invalid bootstrap token"}, status=403)
+
+    User = get_user_model()
+    if User.objects.filter(is_superuser=True).exists():
+        return JsonResponse({"error": "Bootstrap already completed"}, status=409)
+
+    body = json_body(request)
+    username = str((body or {}).get("username") or "").strip()
+    password = str((body or {}).get("password") or "")
+    email = str((body or {}).get("email") or "").strip()
+
+    if not username or not password:
+        return JsonResponse({"error": "username and password are required"}, status=400)
+
+    try:
+        user = User.objects.create_superuser(username=username, email=email, password=password)
+    except Exception:
+        return JsonResponse({"error": "Failed to create superuser"}, status=400)
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "username": getattr(user, "username", ""),
+        },
+        status=201,
+    )
 
 
 @ensure_csrf_cookie
@@ -129,7 +180,11 @@ def admin_calls_log(request):
         return JsonResponse({"error": "Method not allowed"}, status=405)
     try:
         limit = parse_limit_param(request)
-        rows = MpesaCalls.objects.all()[:limit]
+        rows = MpesaCalls.objects.all()
+        business_id = request.GET.get("business_id")
+        if business_id:
+            rows = rows.filter(business_id=business_id)
+        rows = rows[:limit]
         return JsonResponse({"results": list(rows.values())})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
@@ -142,7 +197,11 @@ def admin_callbacks_log(request):
         return JsonResponse({"error": "Method not allowed"}, status=405)
     try:
         limit = parse_limit_param(request)
-        rows = MpesaCallBacks.objects.all()[:limit]
+        rows = MpesaCallBacks.objects.all()
+        business_id = request.GET.get("business_id")
+        if business_id:
+            rows = rows.filter(business_id=business_id)
+        rows = rows[:limit]
         return JsonResponse({"results": list(rows.values())})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
@@ -155,7 +214,11 @@ def admin_stk_errors_log(request):
         return JsonResponse({"error": "Method not allowed"}, status=405)
     try:
         limit = parse_limit_param(request)
-        rows = MpesaCallBacks.objects.filter(caller="STK Push Error")[:limit]
+        rows = MpesaCallBacks.objects.filter(caller="STK Push Error")
+        business_id = request.GET.get("business_id")
+        if business_id:
+            rows = rows.filter(business_id=business_id)
+        rows = rows[:limit]
         return JsonResponse({"results": list(rows.values())})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)

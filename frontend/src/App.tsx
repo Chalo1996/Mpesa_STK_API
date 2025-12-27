@@ -6,6 +6,7 @@ import { CallsLogPage } from "./pages/CallsLogPage";
 import { CallbacksLogPage } from "./pages/CallbacksLogPage";
 import { B2bBulkPage } from "./pages/B2bBulkPage";
 import { B2cBulkPage } from "./pages/B2cBulkPage";
+import { BootstrapSuperuserPage } from "./pages/BootstrapSuperuserPage";
 import { QrCodePage } from "./pages/QrCodePage";
 import { RatibaPage } from "./pages/RatibaPage";
 import { MaintainerClientsPage } from "./pages/MaintainerClientsPage";
@@ -132,6 +133,10 @@ function App() {
         <AuthBanner />
         <Routes>
           <Route path='/' element={<Navigate to='/transactions' replace />} />
+          <Route
+            path='/bootstrap/superuser'
+            element={<BootstrapSuperuserPage />}
+          />
           <Route path='/token' element={<AccessTokenPage />} />
           <Route path='/stk' element={<StkPushPage />} />
           <Route path='/c2b/register' element={<RegisterC2BPage />} />
