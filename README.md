@@ -252,6 +252,10 @@ See `USAGE.md` for:
 - Sample curl requests
 - ngrok workflow tips and troubleshooting
 
+## Contributing
+
+See `CONTRIBUTING.md` for the required branch + PR workflow and recommended GitHub branch protection settings.
+
 ## Tests
 
 Run the test suite:
