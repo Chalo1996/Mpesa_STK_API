@@ -3,6 +3,10 @@ import { apiRequest } from "../lib/api";
 
 type Row = Record<string, unknown>;
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 function normalize(value: unknown): string {
   if (value === null || value === undefined) return "";
   if (typeof value === "string") return value;
@@ -28,7 +32,11 @@ export function CallsLogPage() {
       });
       setStatus(result.status);
       if (result.status >= 200 && result.status < 300) {
-        setRows(Array.isArray(result.data?.results) ? result.data.results : []);
+        const results =
+          isRecord(result.data) && Array.isArray(result.data["results"])
+            ? (result.data["results"] as unknown[])
+            : [];
+        setRows(results as Row[]);
       } else {
         setRows([]);
         setError(

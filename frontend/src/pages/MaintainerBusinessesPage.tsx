@@ -2,6 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiRequest } from "../lib/api";
 import { JsonViewer } from "../components/JsonViewer";
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 type BusinessRow = {
   id: string;
   name: string;
@@ -75,11 +79,19 @@ export function MaintainerBusinessesPage() {
       });
       setStatus(result.status);
       setData(result.data);
-      setBusinesses(
-        Array.isArray(result.data?.results) ? result.data.results : []
-      );
+      const results =
+        isRecord(result.data) && Array.isArray(result.data["results"])
+          ? (result.data["results"] as unknown[])
+          : [];
+      setBusinesses(results as BusinessRow[]);
 
-      const firstId = String((result.data?.results || [])[0]?.id || "");
+      const firstRow = results[0];
+      const firstId =
+        isRecord(firstRow) &&
+        (typeof firstRow["id"] === "string" ||
+          typeof firstRow["id"] === "number")
+          ? String(firstRow["id"])
+          : "";
       if (firstId) {
         setSelectedBusinessId((prev) => prev || firstId);
       }
@@ -102,14 +114,18 @@ export function MaintainerBusinessesPage() {
       );
       setStatus(result.status);
       setData(result.data);
-      setDetailShortcodes(
-        Array.isArray(result.data?.shortcodes) ? result.data.shortcodes : []
-      );
-      setDetailCredentials(
-        Array.isArray(result.data?.daraja_credentials)
-          ? result.data.daraja_credentials
-          : []
-      );
+      const shortcodes =
+        isRecord(result.data) && Array.isArray(result.data["shortcodes"])
+          ? (result.data["shortcodes"] as unknown[])
+          : [];
+      setDetailShortcodes(shortcodes as ShortcodeRow[]);
+
+      const creds =
+        isRecord(result.data) &&
+        Array.isArray(result.data["daraja_credentials"])
+          ? (result.data["daraja_credentials"] as unknown[])
+          : [];
+      setDetailCredentials(creds as CredentialRow[]);
     } finally {
       setLoading(false);
     }

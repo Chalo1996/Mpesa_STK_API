@@ -46,7 +46,11 @@ export function B2bBulkPage() {
       method: "GET",
     });
     if (res.status >= 200 && res.status < 300) {
-      setBatches(Array.isArray(res.data?.results) ? res.data.results : []);
+      const results =
+        isRecord(res.data) && Array.isArray(res.data["results"])
+          ? (res.data["results"] as unknown[])
+          : [];
+      setBatches(results as BatchSummary[]);
     }
   }
 

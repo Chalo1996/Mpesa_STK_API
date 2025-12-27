@@ -8,6 +8,25 @@ type MeResponse = {
   is_staff?: boolean;
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function asMeResponse(value: unknown): MeResponse {
+  if (!isRecord(value) || typeof value["authenticated"] !== "boolean") {
+    return { authenticated: false };
+  }
+  const username =
+    typeof value["username"] === "string" ? value["username"] : undefined;
+  const isStaff =
+    typeof value["is_staff"] === "boolean" ? value["is_staff"] : undefined;
+  return {
+    authenticated: value["authenticated"] as boolean,
+    username,
+    is_staff: isStaff,
+  };
+}
+
 export function AuthBanner() {
   const [me, setMe] = useState<MeResponse>({ authenticated: false });
   const [username, setUsername] = useState("");
@@ -18,7 +37,7 @@ export function AuthBanner() {
   async function refreshMe() {
     const result = await apiRequest("/api/v1/auth/me", { method: "GET" });
     if (result.status >= 200 && result.status < 300) {
-      setMe(result.data || { authenticated: false });
+      setMe(asMeResponse(result.data));
     } else {
       setMe({ authenticated: false });
     }
