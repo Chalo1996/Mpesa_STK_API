@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiRequest } from "../lib/api";
+import { apiRequest, extractStatusMessage } from "../lib/api";
 import { JsonViewer } from "../components/JsonViewer";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -26,6 +26,7 @@ export function StkPushPage() {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<number | null>(null);
   const [data, setData] = useState<unknown>(null);
+  const [notice, setNotice] = useState<string>("");
   const [waitingForCallback, setWaitingForCallback] = useState(false);
   const pollTimerRef = useRef<number | null>(null);
 
@@ -103,6 +104,7 @@ export function StkPushPage() {
     setLoading(true);
     setStatus(null);
     setData(null);
+    setNotice("");
     setWaitingForCallback(false);
     clearPoll();
 
@@ -119,6 +121,7 @@ export function StkPushPage() {
       });
       setStatus(result.status);
       setData(result.data);
+      setNotice(extractStatusMessage(result.data));
 
       // If this looks like a successful STK push initiation, poll transactions
       // until the callback has been persisted, then redirect to Transactions.
@@ -203,6 +206,8 @@ export function StkPushPage() {
           ) : null}
         </div>
       </form>
+
+      {notice ? <div className='notice'>{notice}</div> : null}
 
       <JsonViewer value={data} />
     </section>

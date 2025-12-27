@@ -10,6 +10,7 @@ from django.views.decorators.csrf import csrf_exempt
 from services_common.auth import require_oauth2, require_staff
 from services_common.http import json_body, parse_limit_param
 from services_common.tenancy import resolve_business_from_request
+from services_common.status_codes import apply_mapped_status, map_safaricom_status
 
 from .models import B2CPaymentRequest, BulkPayoutBatch, BulkPayoutItem
 
@@ -57,6 +58,8 @@ def _serialize_payment_request(pr: B2CPaymentRequest):
         "status": pr.status,
         "result_code": pr.result_code,
         "result_desc": pr.result_desc,
+        "status_code": pr.internal_status_code,
+        "status_message": pr.internal_status_message,
         "transaction_id": pr.transaction_id,
         "product_type": pr.product_type,
         "request_payload": pr.request_payload,
@@ -334,7 +337,16 @@ def single_paymentrequest(request):
             ]
         )
 
-        return JsonResponse({"ok": True, "payment_request": _serialize_payment_request(pr)}, status=201)
+        mapped = map_safaricom_status(code=pr.response_code, message=pr.response_description)
+        return JsonResponse(
+            {
+                "ok": True,
+                "status_code": mapped.status_code,
+                "status_message": mapped.status_message,
+                "payment_request": _serialize_payment_request(pr),
+            },
+            status=201,
+        )
     except Exception as e:
         pr.status = B2CPaymentRequest.STATUS_ERROR
         pr.api_error_payload = {"error": str(e)}
@@ -384,6 +396,13 @@ def callback_result(request):
     pr.conversation_id = str(result.get("ConversationID") or pr.conversation_id or "")
     pr.result_code = result.get("ResultCode") if isinstance(result.get("ResultCode"), int) else pr.result_code
     pr.result_desc = str(result.get("ResultDesc") or pr.result_desc or "")
+    if pr.result_code is not None:
+        apply_mapped_status(
+            pr,
+            external_system="safaricom",
+            external_code=pr.result_code,
+            external_message=pr.result_desc,
+        )
     pr.transaction_id = _extract_transaction_id(body) or pr.transaction_id
     pr.save(
         update_fields=[
@@ -392,6 +411,8 @@ def callback_result(request):
             "conversation_id",
             "result_code",
             "result_desc",
+            "internal_status_code",
+            "internal_status_message",
             "transaction_id",
             "updated_at",
         ]

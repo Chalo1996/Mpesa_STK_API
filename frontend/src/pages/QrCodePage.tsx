@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { apiRequest } from "../lib/api";
+import { apiRequest, extractStatusMessage } from "../lib/api";
 import { JsonViewer } from "../components/JsonViewer";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -10,6 +10,7 @@ export function QrCodePage() {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<number | null>(null);
   const [data, setData] = useState<unknown>(null);
+  const [notice, setNotice] = useState<string>("");
 
   const [merchantName, setMerchantName] = useState("My Shop");
   const [refNo, setRefNo] = useState("INV-001");
@@ -22,6 +23,7 @@ export function QrCodePage() {
     setLoading(true);
     setStatus(null);
     setData(null);
+    setNotice("");
 
     try {
       const payload: Record<string, unknown> = {
@@ -39,6 +41,7 @@ export function QrCodePage() {
       });
       setStatus(result.status);
       setData(result.data);
+      setNotice(extractStatusMessage(result.data));
     } finally {
       setLoading(false);
     }
@@ -128,6 +131,8 @@ export function QrCodePage() {
           ) : null}
         </div>
       </div>
+
+      {notice ? <div className='notice'>{notice}</div> : null}
 
       {qrBase64 ? (
         <section className='panel' aria-label='QR Result'>

@@ -100,6 +100,8 @@ class B2CPaymentRequest(models.Model):
 
 	result_code = models.IntegerField(null=True, blank=True)
 	result_desc = models.TextField(blank=True, default="")
+	internal_status_code = models.IntegerField(null=True, blank=True)
+	internal_status_message = models.TextField(blank=True, default="")
 	transaction_id = models.CharField(max_length=100, blank=True, default="")
 	product_type = models.CharField(max_length=60, blank=True, default="")
 

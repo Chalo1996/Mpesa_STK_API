@@ -23,6 +23,7 @@ from mpesa_api.mpesa_credentials import LipanaMpesaPassword, MpesaC2bCredential
 from services_common.auth import require_oauth2, require_staff
 from services_common.http import json_body, parse_mpesa_timestamp
 from services_common.tenancy import resolve_business_from_request
+from services_common.status_codes import apply_mapped_status, map_safaricom_status
 
 
 def _resolve_shortcode(shortcode: str | None):
@@ -218,6 +219,18 @@ def stk_push(request):
                     response_payload=response_data,
                 )
 
+        # Integrator-facing response: include our simplified mapped status.
+        if isinstance(response_data, dict):
+            mapped = map_safaricom_status(
+                code=response_data.get("ResponseCode") or response_data.get("responseCode"),
+                message=response_data.get("ResponseDescription") or response_data.get("responseDescription"),
+            )
+            response_data = {
+                **response_data,
+                "status_code": mapped.status_code,
+                "status_message": mapped.status_message,
+            }
+
         return JsonResponse(response_data)
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
@@ -340,7 +353,24 @@ def transaction_status_query(request):
             row.originator_conversation_id = str(data.get("OriginatorConversationID") or row.originator_conversation_id or "")
         row.save(update_fields=["response_payload", "conversation_id", "originator_conversation_id", "updated_at"])
 
-        return JsonResponse({"ok": True, "query_id": row.id, "response": row.response_payload}, status=201)
+        mapped = None
+        if isinstance(row.response_payload, dict):
+            mapped = map_safaricom_status(
+                code=row.response_payload.get("ResponseCode") or row.response_payload.get("responseCode"),
+                message=row.response_payload.get("ResponseDescription")
+                or row.response_payload.get("responseDescription"),
+            )
+
+        return JsonResponse(
+            {
+                "ok": True,
+                "query_id": row.id,
+                "status_code": mapped.status_code if mapped else None,
+                "status_message": mapped.status_message if mapped else "",
+                "response": row.response_payload,
+            },
+            status=201,
+        )
     except Exception as e:
         row.response_payload = {"error": str(e)}
         row.status = "failed"
@@ -364,7 +394,7 @@ def transaction_status_result(request):
     result_code = result.get("ResultCode") if isinstance(result.get("ResultCode"), int) else None
     result_desc = str(result.get("ResultDesc") or "").strip()
 
-    MpesaCallBacks.objects.create(
+    cb = MpesaCallBacks.objects.create(
         ip_address=request.META.get("REMOTE_ADDR"),
         caller="Transaction Status Result",
         conversation_id=originator_id or conversation_id,
@@ -372,6 +402,17 @@ def transaction_status_result(request):
         result_code=result_code,
         result_description=result_desc,
     )
+
+    if result_code is not None:
+        apply_mapped_status(
+            cb,
+            external_system="safaricom",
+            external_code=result_code,
+            external_message=result_desc,
+            code_field="internal_status_code",
+            message_field="internal_status_message",
+        )
+        cb.save(update_fields=["internal_status_code", "internal_status_message", "updated_at"])
 
     row = None
     if originator_id:
@@ -393,6 +434,13 @@ def transaction_status_result(request):
         row.result_payload = body
         row.result_code = result_code
         row.result_description = result_desc
+        if result_code is not None:
+            apply_mapped_status(
+                row,
+                external_system="safaricom",
+                external_code=result_code,
+                external_message=result_desc,
+            )
         row.resolved_at = timezone.now()
         if txn_id and not row.transaction_id:
             row.transaction_id = txn_id
@@ -403,6 +451,8 @@ def transaction_status_result(request):
                 "result_payload",
                 "result_code",
                 "result_description",
+                "internal_status_code",
+                "internal_status_message",
                 "resolved_at",
                 "transaction_id",
                 "status",
@@ -417,7 +467,25 @@ def transaction_status_result(request):
                 p.status = "successful" if result_code == 0 else "failed"
                 p.result_code = result_code
                 p.result_description = result_desc
-                p.save(update_fields=["status", "result_code", "result_description", "updated_at"])
+                if result_code is not None:
+                    apply_mapped_status(
+                        p,
+                        external_system="safaricom",
+                        external_code=result_code,
+                        external_message=result_desc,
+                    )
+                    p.save(
+                        update_fields=[
+                            "status",
+                            "result_code",
+                            "result_description",
+                            "internal_status_code",
+                            "internal_status_message",
+                            "updated_at",
+                        ]
+                    )
+                else:
+                    p.save(update_fields=["status", "result_code", "result_description", "updated_at"])
 
     return JsonResponse({"ok": True})
 
@@ -434,7 +502,7 @@ def transaction_status_timeout(request):
 
     originator_id = _extract_originator_conversation_id(body)
     conversation_id = _extract_conversation_id(body)
-    MpesaCallBacks.objects.create(
+    cb = MpesaCallBacks.objects.create(
         ip_address=request.META.get("REMOTE_ADDR"),
         caller="Transaction Status Timeout",
         conversation_id=originator_id or conversation_id,
@@ -442,6 +510,16 @@ def transaction_status_timeout(request):
         result_code=-1,
         result_description="timeout",
     )
+
+    apply_mapped_status(
+        cb,
+        external_system="gateway",
+        external_code="TIMEOUT",
+        external_message="timeout",
+        code_field="internal_status_code",
+        message_field="internal_status_message",
+    )
+    cb.save(update_fields=["internal_status_code", "internal_status_message", "updated_at"])
 
     row = None
     if originator_id:
@@ -453,8 +531,24 @@ def transaction_status_timeout(request):
         row.result_payload = body
         row.result_code = -1
         row.result_description = "timeout"
+        apply_mapped_status(
+            row,
+            external_system="gateway",
+            external_code="TIMEOUT",
+            external_message="timeout",
+        )
         row.resolved_at = timezone.now()
-        row.save(update_fields=["result_payload", "result_code", "result_description", "resolved_at", "updated_at"])
+        row.save(
+            update_fields=[
+                "result_payload",
+                "result_code",
+                "result_description",
+                "internal_status_code",
+                "internal_status_message",
+                "resolved_at",
+                "updated_at",
+            ]
+        )
 
     return JsonResponse({"ok": True})
 
@@ -653,6 +747,12 @@ def stk_callback(request):
                 payment.status = desired_status
                 payment.result_code = result_code
                 payment.result_description = result_desc
+                apply_mapped_status(
+                    payment,
+                    external_system="safaricom",
+                    external_code=result_code,
+                    external_message=result_desc,
+                )
             payment.merchant_request_id = merchant_request_id or payment.merchant_request_id
             payment.checkout_request_id = checkout_request_id or payment.checkout_request_id
             payment.amount = amount or payment.amount
@@ -680,13 +780,15 @@ def stk_callback(request):
                     "status",
                     "result_code",
                     "result_description",
+                    "internal_status_code",
+                    "internal_status_message",
                     "business",
                     "shortcode",
                     "updated_at",
                 ]
             )
         else:
-            MpesaPayment.objects.create(
+            payment = MpesaPayment.objects.create(
                 merchant_request_id=merchant_request_id,
                 checkout_request_id=checkout_request_id,
                 transaction_id=txn_id or None,
@@ -701,8 +803,15 @@ def stk_callback(request):
                 business=initiation.business if initiation else None,
                 shortcode=initiation.shortcode if initiation else None,
             )
+            apply_mapped_status(
+                payment,
+                external_system="safaricom",
+                external_code=result_code,
+                external_message=result_desc,
+            )
+            payment.save(update_fields=["internal_status_code", "internal_status_message", "updated_at"])
 
-        MpesaCallBacks.objects.create(
+        cb = MpesaCallBacks.objects.create(
             ip_address=request.META.get("REMOTE_ADDR"),
             caller="STK Push Callback",
             conversation_id=merchant_request_id,
@@ -712,6 +821,16 @@ def stk_callback(request):
             business=initiation.business if initiation else None,
             shortcode=initiation.shortcode if initiation else None,
         )
+
+        apply_mapped_status(
+            cb,
+            external_system="safaricom",
+            external_code=result_code,
+            external_message=result_desc,
+            code_field="internal_status_code",
+            message_field="internal_status_message",
+        )
+        cb.save(update_fields=["internal_status_code", "internal_status_message", "updated_at"])
 
         return JsonResponse({"ResultCode": 0, "ResultDesc": "Received Successfully"})
     except Exception as e:

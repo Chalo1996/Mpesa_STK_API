@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { apiRequest } from "../lib/api";
+import { apiRequest, extractStatusMessage } from "../lib/api";
 import { JsonViewer } from "../components/JsonViewer";
 
 type BatchSummary = {
@@ -34,6 +34,7 @@ export function B2bBulkPage() {
   const [singleStatus, setSingleStatus] = useState<number | null>(null);
   const [singleError, setSingleError] = useState<string>("");
   const [singleData, setSingleData] = useState<unknown>(null);
+  const [singleNotice, setSingleNotice] = useState<string>("");
 
   const [reference, setReference] = useState("B2B-001");
   const [itemsText, setItemsText] = useState(
@@ -51,6 +52,7 @@ export function B2bBulkPage() {
   const [status, setStatus] = useState<number | null>(null);
   const [error, setError] = useState<string>("");
   const [data, setData] = useState<unknown>(null);
+  const [notice, setNotice] = useState<string>("");
 
   const [batches, setBatches] = useState<BatchSummary[]>([]);
   const [selectedBatchId, setSelectedBatchId] = useState<string>("");
@@ -94,6 +96,7 @@ export function B2bBulkPage() {
     setStatus(null);
     setError("");
     setData(null);
+    setNotice("");
 
     try {
       let parsed: unknown = null;
@@ -125,6 +128,7 @@ export function B2bBulkPage() {
 
       setStatus(res.status);
       setData(res.data);
+      setNotice(extractStatusMessage(res.data));
 
       if (res.status >= 200 && res.status < 300) {
         const batchObj = isRecord(res.data) ? res.data["batch"] : undefined;
@@ -163,6 +167,7 @@ export function B2bBulkPage() {
     setSingleStatus(null);
     setSingleError("");
     setSingleData(null);
+    setSingleNotice("");
 
     const payload = {
       business_id: businessId.trim(),
@@ -181,6 +186,7 @@ export function B2bBulkPage() {
 
     setSingleStatus(res.status);
     setSingleData(res.data);
+    setSingleNotice(extractStatusMessage(res.data));
     if (res.status < 200 || res.status >= 300) {
       const apiError =
         isRecord(res.data) && typeof res.data["error"] === "string"
@@ -305,6 +311,7 @@ export function B2bBulkPage() {
             </div>
           </div>
 
+          {singleNotice ? <div className='notice'>{singleNotice}</div> : null}
           {singleError ? <div className='error'>{singleError}</div> : null}
           <JsonViewer value={singleData} />
         </>
@@ -360,6 +367,7 @@ export function B2bBulkPage() {
             </div>
           </div>
 
+          {notice ? <div className='notice'>{notice}</div> : null}
           {error ? <div className='error'>{error}</div> : null}
 
           <JsonViewer value={data} />

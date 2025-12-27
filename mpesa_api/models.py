@@ -70,6 +70,9 @@ class MpesaPayment(BaseModel):
     result_code = models.IntegerField(null=True, blank=True)
     result_description = models.TextField(blank=True, null=True)
 
+    internal_status_code = models.IntegerField(null=True, blank=True)
+    internal_status_message = models.TextField(blank=True, default="")
+
     def __str__(self):
         return f"Transaction {self.transaction_id} - {self.status}"
 
@@ -96,6 +99,9 @@ class MpesaCallBacks(BaseModel):
     content = models.JSONField()
     result_code = models.IntegerField(null=True, blank=True)
     result_description = models.TextField(blank=True, null=True)
+
+    internal_status_code = models.IntegerField(null=True, blank=True)
+    internal_status_message = models.TextField(blank=True, default="")
 
     def __str__(self):
         return f"Callback - {self.conversation_id}"
@@ -201,6 +207,9 @@ class MpesaTransactionStatusQuery(BaseModel):
 
     result_code = models.IntegerField(null=True, blank=True)
     result_description = models.TextField(blank=True, null=True)
+
+    internal_status_code = models.IntegerField(null=True, blank=True)
+    internal_status_message = models.TextField(blank=True, default="")
     status = models.CharField(
         max_length=20,
         choices=[("successful", "Successful"), ("failed", "Failed"), ("pending", "Pending")],

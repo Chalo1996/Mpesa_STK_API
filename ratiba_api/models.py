@@ -43,6 +43,8 @@ class RatibaOrder(BaseModel):
     callback_received_at = models.DateTimeField(blank=True, null=True)
     callback_result_code = models.IntegerField(blank=True, null=True)
     callback_result_description = models.TextField(blank=True)
+    internal_status_code = models.IntegerField(null=True, blank=True)
+    internal_status_message = models.TextField(blank=True, default="")
     callback_payload = models.JSONField(default=dict)
 
     class Meta:

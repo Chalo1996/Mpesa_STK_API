@@ -88,6 +88,8 @@ class B2BUSSDPushRequest(models.Model):
 	callback_payload = models.JSONField(default=dict, blank=True)
 	result_code = models.CharField(max_length=50, blank=True, default="")
 	result_desc = models.TextField(blank=True, default="")
+	internal_status_code = models.IntegerField(null=True, blank=True)
+	internal_status_message = models.TextField(blank=True, default="")
 	amount = models.CharField(max_length=30, blank=True, default="")
 	product_type = models.CharField(max_length=60, blank=True, default="")
 	payment_reference = models.CharField(max_length=120, blank=True, default="")

@@ -1,16 +1,18 @@
 import { useState } from "react";
-import { apiRequest } from "../lib/api";
+import { apiRequest, extractStatusMessage } from "../lib/api";
 import { JsonViewer } from "../components/JsonViewer";
 
 export function RegisterC2BPage() {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<number | null>(null);
   const [data, setData] = useState<unknown>(null);
+  const [notice, setNotice] = useState<string>("");
 
   async function register() {
     setLoading(true);
     setStatus(null);
     setData(null);
+    setNotice("");
 
     try {
       const result = await apiRequest("/api/v1/c2b/register", {
@@ -18,6 +20,7 @@ export function RegisterC2BPage() {
       });
       setStatus(result.status);
       setData(result.data);
+      setNotice(extractStatusMessage(result.data));
     } finally {
       setLoading(false);
     }
@@ -41,6 +44,8 @@ export function RegisterC2BPage() {
         </button>
         {status !== null ? <span className='badge'>HTTP {status}</span> : null}
       </div>
+
+      {notice ? <div className='notice'>{notice}</div> : null}
 
       <JsonViewer value={data} />
     </section>

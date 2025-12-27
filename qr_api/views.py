@@ -10,6 +10,7 @@ from mpesa_api.models import MpesaCalls
 from mpesa_api.mpesa_credentials import MpesaC2bCredential
 from services_common.auth import require_oauth2, require_staff
 from services_common.http import json_body
+from services_common.status_codes import apply_mapped_status
 
 from .models import QrCode
 
@@ -68,6 +69,8 @@ def _serialize_qr(record: QrCode, include_payloads: bool = False):
         "response_status": record.response_status,
         "has_qr_code": bool(record.qr_code_base64),
         "error": record.error or "",
+        "status_code": record.internal_status_code,
+        "status_message": record.internal_status_message or "",
     }
     if include_payloads:
         data["request_payload"] = record.request_payload
@@ -155,7 +158,7 @@ def generate_qr(request):
     try:
         resp = requests.post(api_url, json=payload, headers=headers, timeout=30)
     except Exception as e:
-        QrCode.objects.create(
+        rec = QrCode.objects.create(
             ip_address=request.META.get("REMOTE_ADDR"),
             requested_by=_maybe_user_id(request),
             business=business,
@@ -171,13 +174,27 @@ def generate_qr(request):
             response_payload={},
             error=str(e),
         )
+        apply_mapped_status(
+            rec,
+            external_system="gateway",
+            external_code="REQUEST_ERROR",
+            external_message=str(e),
+        )
+        rec.save(update_fields=["internal_status_code", "internal_status_message", "updated_at"])
         MpesaCalls.objects.create(
             ip_address=request.META.get("REMOTE_ADDR"),
             caller="QR Generate Error",
             conversation_id=str(payload.get("RefNo") or ""),
             content=json.dumps({"error": str(e)}),
         )
-        return JsonResponse({"error": str(e)}, status=502)
+        return JsonResponse(
+            {
+                "error": str(e),
+                "status_code": rec.internal_status_code,
+                "status_message": rec.internal_status_message or str(e),
+            },
+            status=502,
+        )
 
     try:
         data = resp.json()
@@ -195,7 +212,7 @@ def generate_qr(request):
     if isinstance(data, dict) and isinstance(data.get("QRCode"), str):
         qr_base64 = data.get("QRCode") or ""
 
-    QrCode.objects.create(
+    rec = QrCode.objects.create(
         ip_address=request.META.get("REMOTE_ADDR"),
         requested_by=_maybe_user_id(request),
         business=business,
@@ -211,6 +228,33 @@ def generate_qr(request):
         response_payload=data if isinstance(data, dict) else {"data": data},
         qr_code_base64=qr_base64,
     )
+
+    response_code = None
+    response_desc = ""
+    if isinstance(data, dict):
+        response_code = data.get("ResponseCode") or data.get("responseCode")
+        response_desc = str(data.get("ResponseDescription") or data.get("responseDescription") or "").strip()
+
+    if response_code is not None and str(response_code).strip() != "":
+        mapped = apply_mapped_status(
+            rec,
+            external_system="safaricom",
+            external_code=response_code,
+            external_message=response_desc,
+        )
+    else:
+        mapped = apply_mapped_status(
+            rec,
+            external_system="gateway",
+            external_code=f"HTTP_{resp.status_code}",
+            external_message=response_desc,
+        )
+
+    rec.save(update_fields=["internal_status_code", "internal_status_message", "updated_at"])
+
+    if isinstance(data, dict):
+        data["status_code"] = mapped.status_code
+        data["status_message"] = mapped.status_message
 
     return JsonResponse(data, status=resp.status_code)
 

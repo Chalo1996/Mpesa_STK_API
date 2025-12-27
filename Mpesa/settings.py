@@ -92,6 +92,7 @@ INSTALLED_APPS = [
     'ratiba_api',
     'oauth2_provider',
     'maintainer_api',
+    'status_codes',
     'business_api',
     'django.contrib.admin',
     'django.contrib.auth',

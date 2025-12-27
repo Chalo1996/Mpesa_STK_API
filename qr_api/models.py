@@ -47,6 +47,9 @@ class QrCode(BaseModel):
     qr_code_base64 = models.TextField(blank=True)
     error = models.TextField(blank=True)
 
+    internal_status_code = models.IntegerField(null=True, blank=True)
+    internal_status_message = models.TextField(blank=True, default="")
+
     class Meta:
         verbose_name = "QR Code"
         verbose_name_plural = "QR Codes"

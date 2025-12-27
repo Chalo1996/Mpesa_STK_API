@@ -80,6 +80,28 @@ Scope mapping (high level):
 - B2C bulk create: `b2c:write`
 - B2B bulk create: `b2b:write`
 
+## Status codes (internal)
+
+This project maps Safaricom/Daraja result codes into **internal gateway status codes** starting from `0`.
+
+- Integrator-facing endpoints include `{ "status_code", "status_message" }` in addition to any upstream payload.
+- Internal fields are persisted on key records as `internal_status_code` and `internal_status_message`.
+- Safaricom success (external code `0`) is always internal code `0`. Other codes are assigned sequentially.
+
+### Maintaining the mapping table
+
+`StatusCodes.md` is generated from the `StatusCodeMapping` table.
+
+- If you want a stable “contract” list of codes, populate `StatusCodeMapping` (via Django admin or a seed mechanism) and regenerate `StatusCodes.md`.
+- If a code isn’t present in the mapping table, the system will create a mapping automatically the first time it’s seen.
+
+Regenerate `StatusCodes.md`:
+
+```bash
+source .venv/bin/activate
+python manage.py export_status_codes_md > StatusCodes.md
+```
+
 ## Transaction Status Query (reconciliation)
 
 Use this when callbacks are delayed and you need to reconcile a transaction by receipt number.

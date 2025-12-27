@@ -10,6 +10,7 @@ from django.views.decorators.csrf import csrf_exempt
 from services_common.auth import require_oauth2, require_staff
 from services_common.http import json_body, parse_limit_param
 from services_common.tenancy import resolve_business_from_request
+from services_common.status_codes import apply_mapped_status, map_status
 
 from .models import B2BUSSDPushRequest, BulkBusinessPaymentBatch, BulkBusinessPaymentItem
 
@@ -55,6 +56,8 @@ def _serialize_ussd_request(req: B2BUSSDPushRequest):
         "status": req.status,
         "result_code": req.result_code,
         "result_desc": req.result_desc,
+        "status_code": req.internal_status_code,
+        "status_message": req.internal_status_message,
         "amount": req.amount,
         "product_type": req.product_type,
         "payment_reference": req.payment_reference,
@@ -321,7 +324,20 @@ def single_ussd_push(request):
             req.response_status = str(data.get("status") or "")
         req.save(update_fields=["status", "api_response_payload", "response_code", "response_status", "updated_at"])
 
-        return JsonResponse({"ok": True, "ussd_request": _serialize_ussd_request(req)}, status=201)
+        mapped = map_status(
+            external_system="safaricom",
+            external_code=req.response_code,
+            external_message=req.response_status,
+        )
+        return JsonResponse(
+            {
+                "ok": True,
+                "status_code": mapped.status_code,
+                "status_message": mapped.status_message,
+                "ussd_request": _serialize_ussd_request(req),
+            },
+            status=201,
+        )
     except Exception as e:
         req.status = B2BUSSDPushRequest.STATUS_ERROR
         req.api_error_payload = {"error": str(e)}
@@ -361,6 +377,13 @@ def callback_result(request):
     req.status = new_status
     req.result_code = result_code
     req.result_desc = result_desc
+    if result_code:
+        apply_mapped_status(
+            req,
+            external_system="safaricom",
+            external_code=result_code,
+            external_message=result_desc,
+        )
     req.amount = str(body.get("amount") or req.amount or "")
     req.payment_reference = str(body.get("paymentReference") or req.payment_reference or "")
     req.conversation_id = str(body.get("conversationID") or req.conversation_id or "")
@@ -372,6 +395,8 @@ def callback_result(request):
             "status",
             "result_code",
             "result_desc",
+            "internal_status_code",
+            "internal_status_message",
             "amount",
             "payment_reference",
             "conversation_id",

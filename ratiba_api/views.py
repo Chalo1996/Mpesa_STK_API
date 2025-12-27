@@ -11,6 +11,7 @@ from django.views.decorators.csrf import csrf_exempt
 from mpesa_api.mpesa_credentials import MpesaC2bCredential
 from services_common.auth import require_oauth2, require_staff
 from services_common.http import json_body
+from services_common.status_codes import apply_mapped_status
 
 from .models import RatibaOrder
 
@@ -65,6 +66,8 @@ def _serialize_order(order: RatibaOrder, include_payloads: bool = False):
         "callback_received_at": order.callback_received_at.isoformat() if order.callback_received_at else None,
         "callback_result_code": order.callback_result_code,
         "callback_result_description": order.callback_result_description or "",
+        "status_code": order.internal_status_code,
+        "status_message": order.internal_status_message or "",
     }
     if include_payloads:
         data["request_payload"] = order.request_payload
@@ -315,11 +318,20 @@ def ratiba_callback(request):
     matched_order.callback_result_code = result_code
     matched_order.callback_result_description = result_desc
     matched_order.callback_payload = payload
+    if result_code is not None:
+        apply_mapped_status(
+            matched_order,
+            external_system="safaricom",
+            external_code=result_code,
+            external_message=result_desc,
+        )
     matched_order.save(
         update_fields=[
             "callback_received_at",
             "callback_result_code",
             "callback_result_description",
+            "internal_status_code",
+            "internal_status_message",
             "callback_payload",
             "updated_at",
         ]

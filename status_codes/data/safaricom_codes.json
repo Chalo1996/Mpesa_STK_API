@@ -1,0 +1,106 @@
+[
+  {
+    "external_code": "0",
+    "default_message": "Success",
+    "is_success": true
+  },
+
+  {
+    "external_code": "4104",
+    "default_message": "Missing Nominated Number",
+    "is_success": false
+  },
+  {
+    "external_code": "4102",
+    "default_message": "Merchant KYC Fail",
+    "is_success": false
+  },
+  {
+    "external_code": "4201",
+    "default_message": "USSD Network Error",
+    "is_success": false
+  },
+  {
+    "external_code": "4203",
+    "default_message": "USSD Exception Error",
+    "is_success": false
+  },
+
+  {
+    "external_code": "400.003.01",
+    "default_message": "Invalid Access Token",
+    "is_success": false
+  },
+  {
+    "external_code": "400.003.02",
+    "default_message": "Bad Request",
+    "is_success": false
+  },
+  {
+    "external_code": "500.003.03",
+    "default_message": "Error Occurred: Quota Violation",
+    "is_success": false
+  },
+  {
+    "external_code": "500.003.02",
+    "default_message": "Error Occurred: Spike Arrest Violation",
+    "is_success": false
+  },
+  {
+    "external_code": "404.003.01",
+    "default_message": "Resource not found",
+    "is_success": false
+  },
+  {
+    "external_code": "404.001.04",
+    "default_message": "Invalid Authentication Header",
+    "is_success": false
+  },
+  {
+    "external_code": "400.002.05",
+    "default_message": "Invalid Request Payload",
+    "is_success": false
+  },
+
+  {
+    "external_code": "500.003.1001",
+    "default_message": "",
+    "is_success": false
+  },
+
+  {
+    "external_code": "1025",
+    "default_message": "An error occurred while sending push request due to system error on the partner platform.",
+    "is_success": false
+  },
+  {
+    "external_code": "1032",
+    "default_message": "The request was canceled by the user.",
+    "is_success": false
+  },
+  {
+    "external_code": "1037",
+    "default_message": "Timeout",
+    "is_success": false
+  },
+  {
+    "external_code": "2001",
+    "default_message": "The initiator information is invalid.",
+    "is_success": false
+  },
+  {
+    "external_code": "1001",
+    "default_message": "Unable to lock subscriber, a transaction is already in process for the current subscriber.",
+    "is_success": false
+  },
+  {
+    "external_code": "1050",
+    "default_message": "The User already has a standing order with the same name on their profile.",
+    "is_success": false
+  },
+  {
+    "external_code": "1051",
+    "default_message": "Bad request",
+    "is_success": false
+  }
+]

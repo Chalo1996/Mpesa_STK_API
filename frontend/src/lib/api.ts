@@ -105,6 +105,56 @@ export async function apiRequest(
   return { status: response.status, data };
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function asString(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value === null || value === undefined) return "";
+  return String(value);
+}
+
+function pickMessageFromObject(obj: Record<string, unknown>): string {
+  const direct = asString(obj["status_message"]).trim();
+  if (direct) return direct;
+
+  const error = asString(obj["error"]).trim();
+  if (error) return error;
+
+  const resultDesc = asString(obj["ResultDesc"]).trim();
+  if (resultDesc) return resultDesc;
+
+  const responseDesc = asString(obj["ResponseDescription"]).trim();
+  if (responseDesc) return responseDesc;
+
+  const altResponseDesc = asString(obj["responseDescription"]).trim();
+  if (altResponseDesc) return altResponseDesc;
+
+  // Common nested shapes.
+  for (const nestedKey of [
+    "payment_request",
+    "paymentRequest",
+    "request",
+    "batch",
+    "data",
+    "result",
+  ]) {
+    const nested = obj[nestedKey];
+    if (isRecord(nested)) {
+      const msg = pickMessageFromObject(nested);
+      if (msg) return msg;
+    }
+  }
+
+  return "";
+}
+
+export function extractStatusMessage(data: unknown): string {
+  if (isRecord(data)) return pickMessageFromObject(data);
+  return asString(data).trim();
+}
+
 export async function ensureCsrfCookie(): Promise<void> {
   await apiRequest("/api/v1/auth/csrf", { method: "GET" });
 }
