@@ -56,7 +56,9 @@ To enforce this workflow, enable branch protection for `master` in GitHub:
 2. **Add branch protection rule** for `master`
 3. Enable:
    - **Require a pull request before merging**
-   - **Require status checks to pass before merging** (select your CI checks)
+   - **Require status checks to pass before merging** (select the GitHub Actions checks)
+     - `CI / backend`
+     - `CI / frontend`
    - (Optional) **Require approvals** (e.g. 1)
    - (Optional) **Restrict who can push to matching branches**
 
