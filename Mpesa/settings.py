@@ -246,3 +246,7 @@ OAUTH2_PROVIDER = {
     # Force clients to request explicit scopes.
     "DEFAULT_SCOPES": [],
 }
+
+# Django OAuth Toolkit compatibility (some versions expect this setting).
+# Default built-in Application model.
+OAUTH2_PROVIDER_APPLICATION_MODEL = "oauth2_provider.Application"

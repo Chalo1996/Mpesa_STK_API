@@ -29,6 +29,9 @@ urlpatterns = [
     path('qr/', include('qr_api.urls')),
     path('ratiba/', include('ratiba_api.urls')),
 
+    # Customer onboarding (OAuth-bound business configuration)
+    path('business/', include('business_api.urls')),
+
     # Maintainer (superuser) dashboard APIs
     path('maintainer/', include('maintainer_api.urls')),
 

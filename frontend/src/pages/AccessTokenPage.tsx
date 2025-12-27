@@ -21,7 +21,7 @@ export function AccessTokenPage() {
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [scope, setScope] = useState(
-    "transactions:read c2b:write qr:write ratiba:write b2c:write b2b:write"
+    "business:read business:write transactions:read c2b:write qr:write ratiba:write b2c:write b2b:write"
   );
 
   useEffect(() => {

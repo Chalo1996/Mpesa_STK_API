@@ -9,15 +9,20 @@ from django.utils import timezone
 
 from oauth2_provider.models import AccessToken, Application
 
+from business_api.models import Business, MpesaShortcode, OAuthClientBusiness
+
 from .models import QrCode
 
 
 class QrApiTests(TestCase):
     def setUp(self):
         os.environ["MPESA_QR_CODE_URL"] = "https://example.invalid/mpesa/qrcode"
-        self.access_token = self._create_access_token(scope="qr:write")
+        self.business = Business.objects.create(name="My Shop")
+        self.shortcode = MpesaShortcode.objects.create(business=self.business, shortcode="174379", is_active=True)
+        self.access_token, self.app = self._create_access_token(scope="qr:write")
+        OAuthClientBusiness.objects.create(application=self.app, business=self.business)
 
-    def _create_access_token(self, scope: str) -> str:
+    def _create_access_token(self, scope: str):
         User = get_user_model()
         user = User.objects.create_user(username="oauth-owner", password="pw")
         app = Application.objects.create(
@@ -34,7 +39,7 @@ class QrApiTests(TestCase):
             scope=scope,
             expires=timezone.now() + timedelta(hours=1),
         )
-        return token
+        return token, app
 
     def test_generate_requires_bearer_token(self):
         resp = self.client.post(
@@ -54,7 +59,6 @@ class QrApiTests(TestCase):
             "/api/v1/qr/generate",
             data=json.dumps(
                 {
-                    "MerchantName": "My Shop",
                     "RefNo": "INV-1",
                     "Amount": 123,
                     "TrxCode": "BG",
@@ -71,6 +75,8 @@ class QrApiTests(TestCase):
         self.assertEqual(QrCode.objects.count(), 1)
         record = QrCode.objects.first()
         self.assertEqual(record.ref_no, "INV-1")
+        self.assertEqual(record.merchant_name, "My Shop")
+        self.assertEqual(record.cpi, "174379")
         self.assertEqual(record.response_status, 200)
         self.assertEqual(record.qr_code_base64, "BASE64")
 

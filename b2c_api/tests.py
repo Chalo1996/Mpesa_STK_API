@@ -10,15 +10,16 @@ from django.utils import timezone
 from oauth2_provider.models import AccessToken, Application
 
 from business_api.models import Business
-from business_api.models import DarajaCredential
+from business_api.models import DarajaCredential, OAuthClientBusiness
 
 
 class B2CBulkApiTests(TestCase):
 	def setUp(self):
-		self.access_token = self._create_access_token(scope="b2c:write")
 		self.business = Business.objects.create(name="Shop A")
+		self.access_token, self.app = self._create_access_token(scope="b2c:write")
+		OAuthClientBusiness.objects.create(application=self.app, business=self.business)
 
-	def _create_access_token(self, scope: str) -> str:
+	def _create_access_token(self, scope: str):
 		User = get_user_model()
 		user = User.objects.create_user(username="oauth-owner", password="pw")
 		app = Application.objects.create(
@@ -35,7 +36,7 @@ class B2CBulkApiTests(TestCase):
 			scope=scope,
 			expires=timezone.now() + timedelta(hours=1),
 		)
-		return token
+		return token, app
 
 	def test_bulk_create_requires_bearer_token(self):
 		resp = self.client.post(
@@ -51,7 +52,6 @@ class B2CBulkApiTests(TestCase):
 			"/api/v1/b2c/bulk",
 			data=json.dumps(
 				{
-					"business_id": str(self.business.id),
 					"reference": "BATCH-001",
 					"items": [
 						{"recipient": "254700000000", "amount": "1", "currency": "KES"},
@@ -83,8 +83,9 @@ class B2CBulkApiTests(TestCase):
 
 class B2CSingleApiTests(TestCase):
 	def setUp(self):
-		self.access_token = self._create_access_token(scope="b2c:write")
 		self.business = Business.objects.create(name="Shop A")
+		self.access_token, self.app = self._create_access_token(scope="b2c:write")
+		OAuthClientBusiness.objects.create(application=self.app, business=self.business)
 		DarajaCredential.objects.create(
 			business=self.business,
 			environment=DarajaCredential.ENV_SANDBOX,
@@ -94,7 +95,7 @@ class B2CSingleApiTests(TestCase):
 			token_url="https://example.com/token",
 		)
 
-	def _create_access_token(self, scope: str) -> str:
+	def _create_access_token(self, scope: str):
 		User = get_user_model()
 		user = User.objects.create_user(username="oauth-owner", password="pw")
 		app = Application.objects.create(
@@ -111,12 +112,12 @@ class B2CSingleApiTests(TestCase):
 			scope=scope,
 			expires=timezone.now() + timedelta(hours=1),
 		)
-		return token
+		return token, app
 
 	def test_single_requires_bearer_token(self):
 		resp = self.client.post(
 			"/api/v1/b2c/single",
-			data=json.dumps({"business_id": str(self.business.id), "party_b": "254700000000", "amount": "1"}),
+			data=json.dumps({"party_b": "254700000000", "amount": "1"}),
 			content_type="application/json",
 		)
 		self.assertEqual(resp.status_code, 401)
@@ -160,7 +161,6 @@ class B2CSingleApiTests(TestCase):
 			"/api/v1/b2c/single",
 			data=json.dumps(
 				{
-					"business_id": str(self.business.id),
 					"party_b": "254700000000",
 					"amount": "1",
 					"originator_conversation_id": "orig-1",

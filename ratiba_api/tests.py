@@ -9,15 +9,25 @@ from django.utils import timezone
 
 from oauth2_provider.models import AccessToken, Application
 
+from business_api.models import Business, MpesaShortcode, OAuthClientBusiness
+
 from .models import RatibaOrder
 
 
 class RatibaApiTests(TestCase):
     def setUp(self):
         os.environ["MPESA_RATIBA_URL"] = "https://example.invalid/mpesa/ratiba"
-        self.access_token = self._create_access_token(scope="ratiba:write")
+        self.business = Business.objects.create(name="Biz")
+        self.shortcode = MpesaShortcode.objects.create(
+            business=self.business,
+            shortcode="174379",
+            is_active=True,
+            default_ratiba_callback_url="https://example.invalid/ratiba/callback",
+        )
+        self.access_token, self.app = self._create_access_token(scope="ratiba:write")
+        OAuthClientBusiness.objects.create(application=self.app, business=self.business)
 
-    def _create_access_token(self, scope: str) -> str:
+    def _create_access_token(self, scope: str):
         User = get_user_model()
         user = User.objects.create_user(username="oauth-owner", password="pw")
         app = Application.objects.create(
@@ -34,7 +44,7 @@ class RatibaApiTests(TestCase):
             scope=scope,
             expires=timezone.now() + timedelta(hours=1),
         )
-        return token
+        return token, app
 
     def test_create_requires_bearer_token(self):
         resp = self.client.post(
@@ -57,12 +67,10 @@ class RatibaApiTests(TestCase):
                     "StandingOrderName": "Test Standing Order",
                     "StartDate": "20240905",
                     "EndDate": "20250905",
-                    "BusinessShortCode": "174379",
                     "TransactionType": "Standing Order Customer Pay Bill",
                     "ReceiverPartyIdentifierType": "4",
                     "Amount": "4500",
                     "PartyA": "254708374149",
-                    "CallBackURL": "https://example.invalid/pat",
                     "AccountReference": "Test",
                     "TransactionDesc": "Test",
                     "Frequency": "2",
@@ -73,6 +81,12 @@ class RatibaApiTests(TestCase):
         )
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(RatibaOrder.objects.count(), 1)
+
+        row = RatibaOrder.objects.first()
+        self.assertEqual(str(row.business_id), str(self.business.id))
+        self.assertEqual(row.shortcode_id, self.shortcode.id)
+        self.assertEqual(row.request_payload.get("BusinessShortCode"), "174379")
+        self.assertEqual(row.request_payload.get("CallBackURL"), "https://example.invalid/ratiba/callback")
 
     @patch("ratiba_api.views.MpesaC2bCredential.get_access_token", return_value="token")
     def test_create_validates_required_fields(self, _tok):

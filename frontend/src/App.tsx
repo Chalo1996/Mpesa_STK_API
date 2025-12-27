@@ -12,6 +12,7 @@ import { QrCodePage } from "./pages/QrCodePage";
 import { RatibaPage } from "./pages/RatibaPage";
 import { MaintainerClientsPage } from "./pages/MaintainerClientsPage";
 import { MaintainerBusinessesPage } from "./pages/MaintainerBusinessesPage";
+import { OnboardingPage } from "./pages/OnboardingPage";
 import { RegisterC2BPage } from "./pages/RegisterC2BPage";
 import { StkErrorsLogPage } from "./pages/StkErrorsLogPage";
 import { StkPushPage } from "./pages/StkPushPage";
@@ -30,6 +31,14 @@ function App() {
             }
           >
             Access Token
+          </NavLink>
+          <NavLink
+            to='/onboarding'
+            className={({ isActive }) =>
+              isActive ? "nav__link nav__link--active" : "nav__link"
+            }
+          >
+            Onboarding
           </NavLink>
           <NavLink
             to='/stk'
@@ -147,6 +156,7 @@ function App() {
             element={<BootstrapSuperuserPage />}
           />
           <Route path='/token' element={<AccessTokenPage />} />
+          <Route path='/onboarding' element={<OnboardingPage />} />
           <Route path='/stk' element={<StkPushPage />} />
           <Route path='/c2b/register' element={<RegisterC2BPage />} />
           <Route path='/transactions' element={<TransactionsPage />} />

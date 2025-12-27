@@ -10,13 +10,14 @@ from django.utils import timezone
 from oauth2_provider.models import AccessToken, Application
 
 from business_api.models import Business
-from business_api.models import DarajaCredential
+from business_api.models import DarajaCredential, OAuthClientBusiness
 
 
 class B2BBulkApiTests(TestCase):
 	def setUp(self):
-		self.access_token = self._create_access_token(scope="b2b:write")
 		self.business = Business.objects.create(name="Shop B")
+		self.access_token, self.app = self._create_access_token(scope="b2b:write")
+		OAuthClientBusiness.objects.create(application=self.app, business=self.business)
 		DarajaCredential.objects.create(
 			business=self.business,
 			environment=DarajaCredential.ENV_SANDBOX,
@@ -26,7 +27,7 @@ class B2BBulkApiTests(TestCase):
 			token_url="https://example.com/token",
 		)
 
-	def _create_access_token(self, scope: str) -> str:
+	def _create_access_token(self, scope: str):
 		User = get_user_model()
 		user = User.objects.create_user(username="oauth-owner", password="pw")
 		app = Application.objects.create(
@@ -43,7 +44,7 @@ class B2BBulkApiTests(TestCase):
 			scope=scope,
 			expires=timezone.now() + timedelta(hours=1),
 		)
-		return token
+		return token, app
 
 	def test_bulk_create_requires_bearer_token(self):
 		resp = self.client.post(
@@ -59,7 +60,6 @@ class B2BBulkApiTests(TestCase):
 			"/api/v1/b2b/bulk",
 			data=json.dumps(
 				{
-					"business_id": str(self.business.id),
 					"reference": "B2B-001",
 					"items": [
 						{"recipient": "ACCT-001", "amount": "1", "currency": "KES"},
@@ -91,8 +91,9 @@ class B2BBulkApiTests(TestCase):
 
 class B2BSingleUssdApiTests(TestCase):
 	def setUp(self):
-		self.access_token = self._create_access_token(scope="b2b:write")
 		self.business = Business.objects.create(name="Shop B")
+		self.access_token, self.app = self._create_access_token(scope="b2b:write")
+		OAuthClientBusiness.objects.create(application=self.app, business=self.business)
 		DarajaCredential.objects.create(
 			business=self.business,
 			environment=DarajaCredential.ENV_SANDBOX,
@@ -102,7 +103,7 @@ class B2BSingleUssdApiTests(TestCase):
 			token_url="https://example.com/token",
 		)
 
-	def _create_access_token(self, scope: str) -> str:
+	def _create_access_token(self, scope: str):
 		User = get_user_model()
 		user = User.objects.create_user(username="oauth-owner", password="pw")
 		app = Application.objects.create(
@@ -119,14 +120,13 @@ class B2BSingleUssdApiTests(TestCase):
 			scope=scope,
 			expires=timezone.now() + timedelta(hours=1),
 		)
-		return token
+		return token, app
 
 	def test_single_requires_bearer_token(self):
 		resp = self.client.post(
 			"/api/v1/b2b/single",
 			data=json.dumps(
 				{
-					"business_id": str(self.business.id),
 					"primary_short_code": "000001",
 					"receiver_short_code": "000002",
 					"amount": "100",
@@ -166,7 +166,6 @@ class B2BSingleUssdApiTests(TestCase):
 			"/api/v1/b2b/single",
 			data=json.dumps(
 				{
-					"business_id": str(self.business.id),
 					"primary_short_code": "000001",
 					"receiver_short_code": "000002",
 					"amount": "100",

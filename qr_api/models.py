@@ -19,6 +19,21 @@ class QrCode(BaseModel):
         related_name="qr_codes",
     )
 
+    business = models.ForeignKey(
+        "business_api.Business",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="qr_codes",
+    )
+    shortcode = models.ForeignKey(
+        "business_api.MpesaShortcode",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="qr_codes",
+    )
+
     merchant_name = models.CharField(max_length=200)
     ref_no = models.CharField(max_length=120, db_index=True)
     amount = models.DecimalField(max_digits=12, decimal_places=2)

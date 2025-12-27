@@ -91,6 +91,13 @@ def require_oauth2(view_func=None, *, scopes: str | list[str] | None = None, mes
             if required_scopes and not _token_has_scopes(token_obj, required_scopes):
                 return JsonResponse({"error": "Insufficient scope"}, status=403)
 
+            # Make token/application available to downstream handlers.
+            # This enables deriving stable defaults (e.g., bound business) without
+            # forcing callers to resend identifiers on every request.
+            setattr(request, "oauth2_token", token_obj)
+            setattr(request, "oauth2_application", getattr(token_obj, "application", None))
+            setattr(request, "oauth2_scopes", _token_scopes(token_obj))
+
             return func(request, *args, **kwargs)
 
         return _wrapped

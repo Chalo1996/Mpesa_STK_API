@@ -61,7 +61,7 @@ curl -X POST http://127.0.0.1:8000/api/v1/oauth/token/ \
   -d "grant_type=client_credentials" \
   -d "client_id=<CLIENT_ID>" \
   -d "client_secret=<CLIENT_SECRET>" \
-  -d "scope=transactions:read c2b:write qr:write ratiba:write b2c:write b2b:write"
+  -d "scope=transactions:read transactions:write c2b:write qr:write ratiba:write b2c:write b2b:write business:read business:write"
 ```
 
 Use the returned token for API calls:
@@ -74,10 +74,105 @@ Scope mapping (high level):
 
 - STK push: `c2b:write`
 - Transactions: `transactions:read`
+- Transaction reconciliation (status query): `transactions:write`
 - QR generate: `qr:write`
 - Ratiba create: `ratiba:write`
 - B2C bulk create: `b2c:write`
 - B2B bulk create: `b2b:write`
+
+## Transaction Status Query (reconciliation)
+
+Use this when callbacks are delayed and you need to reconcile a transaction by receipt number.
+
+Required `.env` values (server fallback defaults):
+
+```dotenv
+MPESA_TXN_STATUS_QUERY_URL=
+MPESA_TXN_STATUS_INITIATOR_NAME=
+MPESA_TXN_STATUS_SECURITY_CREDENTIAL=
+MPESA_TXN_STATUS_PARTY_A=
+MPESA_TXN_STATUS_IDENTIFIER_TYPE=4
+MPESA_TXN_STATUS_RESULT_URL=https://<your-public-host>/api/v1/c2b/transaction-status/result
+MPESA_TXN_STATUS_TIMEOUT_URL=https://<your-public-host>/api/v1/c2b/transaction-status/timeout
+```
+
+Notes:
+
+- If your OAuth client is bound to a business, you can also persist most of these values per shortcode via `POST /api/v1/business/onboarding` and avoid sending them per-request.
+- The server still needs `MPESA_TXN_STATUS_QUERY_URL` set (where to submit the query).
+
+Initiate a status query:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/c2b/transaction-status/query \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"transaction_id":"<MPESA_RECEIPT_NUMBER>","remarks":"reconcile"}'
+```
+
+Safaricom will call your ResultURL/QueueTimeOutURL asynchronously to finalize reconciliation.
+
+## Onboarding (persist defaults)
+
+Use onboarding to persist per-business defaults (shortcodes, callback URLs, credentials, transaction-status defaults) so you don’t have to pass them on every request.
+
+Prereqs:
+
+- Your OAuth client must be bound to a business (maintainer config), OR you must call staff-session endpoints.
+- Your token should include `business:read` for GET and `business:write` for POST.
+
+### Read onboarding state
+
+```bash
+curl -X GET http://127.0.0.1:8000/api/v1/business/onboarding \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+### Update onboarding state (persist defaults)
+
+Send only the fields you want to change.
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/business/onboarding \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "business_name": "My Business",
+    "business_type": "retail",
+
+    "shortcode": "174379",
+    "shortcode_type": "paybill",
+    "default_stk_callback_url": "https://<your-public-host>/api/v1/c2b/stk/callback",
+    "default_account_reference_prefix": "ORDER-",
+
+    "txn_status_initiator_name": "<your_initiator>",
+    "txn_status_security_credential": "<your_security_credential>",
+    "txn_status_result_url": "https://<your-public-host>/api/v1/c2b/transaction-status/result",
+    "txn_status_timeout_url": "https://<your-public-host>/api/v1/c2b/transaction-status/timeout",
+    "txn_status_identifier_type": "4",
+
+    "environment": "sandbox",
+    "consumer_key": "<daraja_consumer_key>",
+    "consumer_secret": "<daraja_consumer_secret>",
+    "token_url": "https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials"
+  }'
+```
+
+## Aggregation (product totals)
+
+Get totals and totals per `product_type` across C2B incoming + B2C/B2B outgoing.
+
+```bash
+curl -X GET http://127.0.0.1:8000/api/v1/c2b/transactions/aggregate \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+Optional: scope to a specific business (useful for staff-session calls, or to bind an OAuth client on first use):
+
+```bash
+curl -X GET "http://127.0.0.1:8000/api/v1/c2b/transactions/aggregate?business_id=<BUSINESS_UUID>" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
 
 ## B2C single (Safaricom v3)
 
@@ -104,13 +199,17 @@ curl -X POST http://127.0.0.1:8000/api/v1/b2c/single \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "business_id": "<BUSINESS_UUID>",
     "party_b": "2547XXXXXXXX",
     "amount": 1,
     "remarks": "test",
     "occasion": ""
   }'
 ```
+
+Notes:
+
+- `business_id` is optional if your OAuth client is bound to a business (maintainer config).
+- If not bound, include `business_id` in the request once; the server will auto-bind the client.
 
 Callbacks (called by Safaricom):
 
@@ -144,7 +243,6 @@ curl -X POST http://127.0.0.1:8000/api/v1/b2b/single \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "business_id": "<BUSINESS_UUID>",
     "primary_short_code": "000001",
     "receiver_short_code": "000002",
     "amount": "100",
@@ -153,6 +251,11 @@ curl -X POST http://127.0.0.1:8000/api/v1/b2b/single \
     "callback_url": "https://<your-public-host>/api/v1/b2b/callback/result"
   }'
 ```
+
+Notes:
+
+- `business_id` is optional if your OAuth client is bound to a business (maintainer config).
+- If not bound, include `business_id` in the request once; the server will auto-bind the client.
 
 Callback (called by Safaricom):
 
@@ -310,11 +413,16 @@ curl -X GET "http://127.0.0.1:8000/api/v1/transactions/all?business_id=<BUSINESS
 
 ## 6b) Generate a QR Code
 
+Notes:
+
+- If your OAuth client is bound to a business, `MerchantName` is optional (defaults to the business name).
+- If that business has an active shortcode, `CPI` is optional (defaults to that shortcode).
+
 ```bash
 curl -X POST http://127.0.0.1:8000/api/v1/qr/generate \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"MerchantName":"My Shop","RefNo":"INV-001","Amount":1,"TrxCode":"BG"}'
+  -d '{"RefNo":"INV-001","Amount":1,"TrxCode":"BG"}'
 ```
 
 ## 6c) Create a Ratiba Standing Order
@@ -324,6 +432,8 @@ Notes:
 - `CallBackURL` must be a **publicly reachable URL** that Safaricom can POST to.
 - Use the built-in callback endpoint: `POST /api/v1/ratiba/callback`.
 - Correlation: this app matches callbacks to orders primarily via `AccountReference`, so make it unique per standing order.
+- If your OAuth client is bound to a business, and that business has an active shortcode with `default_ratiba_callback_url` set,
+  then `BusinessShortCode` and `CallBackURL` can be omitted.
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/v1/ratiba/create \
@@ -333,12 +443,10 @@ curl -X POST http://127.0.0.1:8000/api/v1/ratiba/create \
     "StandingOrderName":"Test Standing Order",
     "StartDate":"20240905",
     "EndDate":"20250905",
-    "BusinessShortCode":"174379",
     "TransactionType":"Standing Order Customer Pay Bill",
     "ReceiverPartyIdentifierType":"4",
     "Amount":"4500",
     "PartyA":"254708374149",
-    "CallBackURL":"https://<your-public-host>/api/v1/ratiba/callback",
     "AccountReference":"Test-001",
     "TransactionDesc":"Test",
     "Frequency":"2"
@@ -349,8 +457,8 @@ curl -X POST http://127.0.0.1:8000/api/v1/ratiba/create \
 
 Notes:
 
-- `business_id` is required for both B2C and B2B bulk create.
-- Create a Business in the dashboard onboarding UI (or Django admin) and use its UUID as `business_id`.
+- `business_id` is optional if your OAuth client is bound to a business (maintainer config).
+- If not bound, include `business_id` once; the server will auto-bind the client.
 
 B2C:
 
@@ -358,7 +466,7 @@ B2C:
 curl -X POST http://127.0.0.1:8000/api/v1/b2c/bulk \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"business_id":"<BUSINESS_UUID>","reference":"BATCH-001","items":[{"recipient":"254700000000","amount":"1"}]}'
+  -d '{"reference":"BATCH-001","items":[{"recipient":"254700000000","amount":"1"}]}'
 ```
 
 B2B:
@@ -367,7 +475,7 @@ B2B:
 curl -X POST http://127.0.0.1:8000/api/v1/b2b/bulk \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"business_id":"<BUSINESS_UUID>","reference":"B2B-001","items":[{"recipient":"ACCT-001","amount":"1"}]}'
+  -d '{"reference":"B2B-001","items":[{"recipient":"ACCT-001","amount":"1"}]}'
 ```
 
 ## 7) Quick callback sanity checks (via ngrok)

@@ -19,6 +19,21 @@ class RatibaOrder(BaseModel):
         related_name="ratiba_orders",
     )
 
+    business = models.ForeignKey(
+        "business_api.Business",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="ratiba_orders",
+    )
+    shortcode = models.ForeignKey(
+        "business_api.MpesaShortcode",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="ratiba_orders",
+    )
+
     request_payload = models.JSONField(default=dict)
     response_status = models.IntegerField(blank=True, null=True)
     response_payload = models.JSONField(default=dict)

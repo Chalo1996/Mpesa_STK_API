@@ -12,6 +12,7 @@ class Business(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=120)
+    business_type = models.CharField(max_length=60, blank=True, default="")
     status = models.CharField(
         max_length=20,
         choices=[(STATUS_ACTIVE, "Active"), (STATUS_SUSPENDED, "Suspended")],
@@ -114,6 +115,14 @@ class MpesaShortcode(models.Model):
     # Optional defaults for onboarding convenience
     default_account_reference_prefix = models.CharField(max_length=40, blank=True, default="")
     default_stk_callback_url = models.URLField(blank=True, default="")
+    default_ratiba_callback_url = models.URLField(blank=True, default="")
+
+    # Transaction Status Query (reconciliation) defaults
+    txn_status_initiator_name = models.CharField(max_length=120, blank=True, default="")
+    txn_status_security_credential = models.CharField(max_length=500, blank=True, default="")
+    txn_status_result_url = models.URLField(blank=True, default="")
+    txn_status_timeout_url = models.URLField(blank=True, default="")
+    txn_status_identifier_type = models.CharField(max_length=8, blank=True, default="")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -124,3 +133,27 @@ class MpesaShortcode(models.Model):
 
     def __str__(self) -> str:
         return f"{self.shortcode} ({self.shortcode_type})"
+
+
+class OAuthClientBusiness(models.Model):
+    """Bind an OAuth2 client_credentials Application to a Business.
+
+    This lets gateway callers omit `business_id` on most requests since the
+    system can derive it from the Bearer token's Application.
+    """
+
+    id = models.BigAutoField(primary_key=True)
+    application = models.OneToOneField(
+        "oauth2_provider.Application",
+        on_delete=models.CASCADE,
+        related_name="business_binding",
+    )
+    business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name="oauth_clients")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.application_id} -> {self.business_id}"

@@ -9,6 +9,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 from services_common.auth import require_oauth2, require_staff
 from services_common.http import json_body, parse_limit_param
+from services_common.tenancy import resolve_business_from_request
 
 from .models import B2CPaymentRequest, BulkPayoutBatch, BulkPayoutItem
 
@@ -33,6 +34,7 @@ def _serialize_item(item: BulkPayoutItem):
         "recipient": item.recipient,
         "amount": str(item.amount),
         "currency": item.currency,
+        "product_type": item.product_type,
         "item_reference": item.item_reference,
         "status": item.status,
         "result": item.result,
@@ -56,6 +58,7 @@ def _serialize_payment_request(pr: B2CPaymentRequest):
         "result_code": pr.result_code,
         "result_desc": pr.result_desc,
         "transaction_id": pr.transaction_id,
+        "product_type": pr.product_type,
         "request_payload": pr.request_payload,
         "api_response_payload": pr.api_response_payload,
         "api_error_payload": pr.api_error_payload,
@@ -134,15 +137,10 @@ def bulk_create(request):
         return JsonResponse({"error": "items must be a non-empty list"}, status=400)
 
     reference = str(body.get("reference", "")).strip()[:64]
-    business_id = body.get("business_id")
-    if not business_id:
-        return JsonResponse({"error": "business_id is required"}, status=400)
-    try:
-        from business_api.models import Business
 
-        business = Business.objects.get(id=business_id)
-    except Exception:
-        return JsonResponse({"error": "Invalid business_id"}, status=400)
+    business, error = resolve_business_from_request(request, body.get("business_id"))
+    if error:
+        return error
 
     meta = {k: v for k, v in body.items() if k not in {"items"}}
     batch = BulkPayoutBatch.objects.create(reference=reference, meta=meta, business=business)
@@ -154,6 +152,7 @@ def bulk_create(request):
         recipient = str(raw.get("recipient") or raw.get("phone_number") or "").strip()
         amount_raw = raw.get("amount")
         currency = str(raw.get("currency") or "KES").strip().upper()[:3]
+        product_type = str(raw.get("product_type") or "").strip()[:60]
         item_reference = str(raw.get("reference") or "").strip()[:64]
 
         if not recipient:
@@ -170,6 +169,7 @@ def bulk_create(request):
             recipient=recipient,
             amount=amount,
             currency=currency or "KES",
+            product_type=product_type,
             item_reference=item_reference,
         )
         created += 1
@@ -205,16 +205,10 @@ def single_paymentrequest(request):
         return JsonResponse({"error": "Method not allowed"}, status=405)
 
     body = json_body(request)
-    business_id = body.get("business_id")
-    if not business_id:
-        return JsonResponse({"error": "business_id is required"}, status=400)
 
-    try:
-        from business_api.models import Business
-
-        business = Business.objects.get(id=business_id)
-    except Exception:
-        return JsonResponse({"error": "Invalid business_id"}, status=400)
+    business, error = resolve_business_from_request(request, body.get("business_id"))
+    if error:
+        return error
 
     environment = str(body.get("environment") or "sandbox").strip().lower()
     if environment not in {"sandbox", "production"}:
@@ -292,6 +286,7 @@ def single_paymentrequest(request):
         originator_conversation_id=originator_conversation_id,
         status=B2CPaymentRequest.STATUS_QUEUED,
         request_payload=payment_payload,
+        product_type=str(body.get("product_type") or "").strip()[:60],
     )
 
     try:

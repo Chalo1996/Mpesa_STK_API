@@ -58,6 +58,7 @@ class MpesaPayment(BaseModel):
     merchant_request_id = models.CharField(max_length=100, blank=True, null=True)
     checkout_request_id = models.CharField(max_length=100, blank=True, null=True)
     transaction_id = models.CharField(max_length=100, blank=True, null=True)
+    product_type = models.CharField(max_length=60, blank=True, default="")
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     mpesa_receipt_number = models.CharField(max_length=50, blank=True, null=True)
     transaction_date = models.DateTimeField(null=True, blank=True)
@@ -125,6 +126,7 @@ class StkPushInitiation(BaseModel):
     merchant_request_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
     checkout_request_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
     account_reference = models.CharField(max_length=64, blank=True, default="")
+    product_type = models.CharField(max_length=60, blank=True, default="")
 
     request_payload = models.JSONField(default=dict, blank=True)
     response_payload = models.JSONField(default=dict, blank=True)
@@ -165,3 +167,46 @@ class StkPushError(BaseModel):
 
     def __str__(self):
         return f"STK Push Error - {self.merchant_request_id}"
+
+
+class MpesaTransactionStatusQuery(BaseModel):
+    """Stores Transaction Status Query lifecycle.
+
+    - `response_payload` holds the synchronous Daraja response.
+    - `result_payload` holds the asynchronous result callback payload.
+    """
+
+    business = models.ForeignKey(
+        "business_api.Business",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="mpesa_status_queries",
+    )
+    shortcode = models.ForeignKey(
+        "business_api.MpesaShortcode",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="mpesa_status_queries",
+    )
+
+    transaction_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+    originator_conversation_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+    conversation_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+
+    request_payload = models.JSONField(default=dict, blank=True)
+    response_payload = models.JSONField(default=dict, blank=True)
+    result_payload = models.JSONField(default=dict, blank=True)
+
+    result_code = models.IntegerField(null=True, blank=True)
+    result_description = models.TextField(blank=True, null=True)
+    status = models.CharField(
+        max_length=20,
+        choices=[("successful", "Successful"), ("failed", "Failed"), ("pending", "Pending")],
+        default="pending",
+    )
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"Txn Status Query - {self.transaction_id or self.originator_conversation_id or ''}"

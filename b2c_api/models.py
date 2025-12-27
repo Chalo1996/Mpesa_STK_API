@@ -41,6 +41,7 @@ class BulkPayoutItem(models.Model):
 	recipient = models.CharField(max_length=32)
 	amount = models.DecimalField(max_digits=12, decimal_places=2)
 	currency = models.CharField(max_length=3, default="KES")
+	product_type = models.CharField(max_length=60, blank=True, default="")
 	item_reference = models.CharField(max_length=64, blank=True, default="")
 	status = models.CharField(max_length=20, default="queued")
 	result = models.JSONField(default=dict, blank=True)
@@ -100,6 +101,7 @@ class B2CPaymentRequest(models.Model):
 	result_code = models.IntegerField(null=True, blank=True)
 	result_desc = models.TextField(blank=True, default="")
 	transaction_id = models.CharField(max_length=100, blank=True, default="")
+	product_type = models.CharField(max_length=60, blank=True, default="")
 
 	class Meta:
 		ordering = ["-created_at"]

@@ -72,6 +72,17 @@ Vite proxies `/api/*` to `http://127.0.0.1:8000` for local development.
 
 If you run the backend on a different origin (host/port), configure your Vite dev server proxy or update the API base URL in the frontend config so calls reach the Django server.
 
+### Frontend env
+
+Use the template file:
+
+- `frontend/.env.example` (copy to `frontend/.env.local`)
+
+The key variables are:
+
+- `VITE_API_BASE_URL`
+- `VITE_OAUTH_ACCESS_TOKEN` (optional)
+
 ## CSRF
 
 If login fails with CSRF errors, set this in the backend `.env`:

@@ -15,6 +15,40 @@ from services_common.http import json_body
 from .models import RatibaOrder
 
 
+def _resolve_shortcode(shortcode: str | None):
+    if not shortcode:
+        return None
+    try:
+        from business_api.models import MpesaShortcode
+
+        return MpesaShortcode.objects.select_related("business").filter(shortcode=str(shortcode)).first()
+    except Exception:
+        return None
+
+
+def _get_bound_business(request):
+    token_obj = getattr(request, "oauth2_token", None)
+    app = getattr(request, "oauth2_application", None) if token_obj else None
+    if app is None:
+        return None
+    try:
+        from business_api.models import OAuthClientBusiness
+
+        binding = OAuthClientBusiness.objects.select_related("business").filter(application=app).first()
+        return binding.business if binding else None
+    except Exception:
+        return None
+
+
+def _get_default_shortcode_for_business(business):
+    if not business:
+        return None
+    try:
+        return business.shortcodes.filter(is_active=True).order_by("-created_at").first()
+    except Exception:
+        return None
+
+
 def _maybe_user(request):
     user = getattr(request, "user", None)
     if user and getattr(user, "is_authenticated", False):
@@ -155,6 +189,32 @@ def create_ratiba(request):
     if not isinstance(payload, dict) or not payload:
         return JsonResponse({"error": "Request body must be a non-empty JSON object"}, status=400)
 
+    # Normalize common alias keys to Daraja canonical keys.
+    payload = dict(payload)
+    if payload.get("CallBackURL") in (None, ""):
+        alias = payload.get("callback_url") or payload.get("call_back_url") or payload.get("CallbackURL")
+        if alias not in (None, ""):
+            payload["CallBackURL"] = alias
+
+    # Resolve tenancy context when possible.
+    shortcode_value = str(payload.get("shortcode") or payload.get("business_shortcode") or payload.get("BusinessShortCode") or "").strip()
+    shortcode_obj = _resolve_shortcode(shortcode_value)
+    business = shortcode_obj.business if shortcode_obj else _get_bound_business(request)
+    if not shortcode_obj and business:
+        shortcode_obj = _get_default_shortcode_for_business(business)
+
+    if payload.get("BusinessShortCode") in (None, "") and shortcode_obj:
+        payload["BusinessShortCode"] = str(shortcode_obj.shortcode)
+
+    if payload.get("CallBackURL") in (None, ""):
+        default_cb = ""
+        if shortcode_obj and getattr(shortcode_obj, "default_ratiba_callback_url", ""):
+            default_cb = str(shortcode_obj.default_ratiba_callback_url or "")
+        if not default_cb:
+            default_cb = str(os.getenv("RATIBA_CALLBACK_URL") or "")
+        if default_cb:
+            payload["CallBackURL"] = default_cb
+
     validation_error = _validate_ratiba_payload(payload)
     if validation_error:
         return JsonResponse({"error": validation_error}, status=400)
@@ -167,6 +227,8 @@ def create_ratiba(request):
         RatibaOrder.objects.create(
             ip_address=request.META.get("REMOTE_ADDR"),
             requested_by=_maybe_user(request),
+            business=business,
+            shortcode=shortcode_obj,
             request_payload=payload,
             response_status=502,
             response_payload={},
@@ -182,6 +244,8 @@ def create_ratiba(request):
     RatibaOrder.objects.create(
         ip_address=request.META.get("REMOTE_ADDR"),
         requested_by=_maybe_user(request),
+        business=business,
+        shortcode=shortcode_obj,
         request_payload=payload,
         response_status=resp.status_code,
         response_payload=data if isinstance(data, dict) else {"data": data},

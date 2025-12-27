@@ -14,6 +14,40 @@ from services_common.http import json_body
 from .models import QrCode
 
 
+def _resolve_shortcode(shortcode: str | None):
+    if not shortcode:
+        return None
+    try:
+        from business_api.models import MpesaShortcode
+
+        return MpesaShortcode.objects.select_related("business").filter(shortcode=str(shortcode)).first()
+    except Exception:
+        return None
+
+
+def _get_bound_business(request):
+    token_obj = getattr(request, "oauth2_token", None)
+    app = getattr(request, "oauth2_application", None) if token_obj else None
+    if app is None:
+        return None
+    try:
+        from business_api.models import OAuthClientBusiness
+
+        binding = OAuthClientBusiness.objects.select_related("business").filter(application=app).first()
+        return binding.business if binding else None
+    except Exception:
+        return None
+
+
+def _get_default_shortcode_for_business(business):
+    if not business:
+        return None
+    try:
+        return business.shortcodes.filter(is_active=True).order_by("-created_at").first()
+    except Exception:
+        return None
+
+
 def _maybe_user_id(request):
     user = getattr(request, "user", None)
     if user and getattr(user, "is_authenticated", False):
@@ -72,9 +106,16 @@ def generate_qr(request):
     if not isinstance(body, dict):
         body = {}
 
+    # Resolve tenancy context when possible.
+    shortcode_value = str(body.get("shortcode") or body.get("business_shortcode") or "").strip()
+    shortcode_obj = _resolve_shortcode(shortcode_value)
+    business = shortcode_obj.business if shortcode_obj else _get_bound_business(request)
+    if not shortcode_obj and business:
+        shortcode_obj = _get_default_shortcode_for_business(business)
+
     # Accept either canonical Daraja keys or snake_case aliases from the dashboard.
     payload = {
-        "MerchantName": body.get("MerchantName") or body.get("merchant_name") or "",
+        "MerchantName": body.get("MerchantName") or body.get("merchant_name") or (business.name if business else ""),
         "RefNo": body.get("RefNo") or body.get("ref_no") or "",
         "Amount": body.get("Amount") if body.get("Amount") is not None else body.get("amount"),
         "TrxCode": body.get("TrxCode") or body.get("trx_code") or "",
@@ -82,6 +123,8 @@ def generate_qr(request):
 
     cpi = body.get("CPI") if body.get("CPI") is not None else body.get("cpi")
     size = body.get("Size") if body.get("Size") is not None else body.get("size")
+    if cpi in (None, "") and shortcode_obj:
+        cpi = str(shortcode_obj.shortcode)
     if cpi not in (None, ""):
         payload["CPI"] = cpi
     if size not in (None, ""):
@@ -115,6 +158,8 @@ def generate_qr(request):
         QrCode.objects.create(
             ip_address=request.META.get("REMOTE_ADDR"),
             requested_by=_maybe_user_id(request),
+            business=business,
+            shortcode=shortcode_obj,
             merchant_name=str(payload.get("MerchantName") or ""),
             ref_no=str(payload.get("RefNo") or ""),
             amount=payload.get("Amount") or 0,
@@ -153,6 +198,8 @@ def generate_qr(request):
     QrCode.objects.create(
         ip_address=request.META.get("REMOTE_ADDR"),
         requested_by=_maybe_user_id(request),
+        business=business,
+        shortcode=shortcode_obj,
         merchant_name=str(payload.get("MerchantName") or ""),
         ref_no=str(payload.get("RefNo") or ""),
         amount=payload.get("Amount") or 0,

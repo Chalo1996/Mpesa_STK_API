@@ -12,6 +12,14 @@ urlpatterns = [
 	path("stk/error", views.stk_error, name="c2b_stk_error"),
 	path("stk/error/", views.stk_error),
 
+	# Transaction status (reconciliation)
+	path("transaction-status/query", views.transaction_status_query, name="c2b_transaction_status_query"),
+	path("transaction-status/query/", views.transaction_status_query),
+	path("transaction-status/result", views.transaction_status_result, name="c2b_transaction_status_result"),
+	path("transaction-status/result/", views.transaction_status_result),
+	path("transaction-status/timeout", views.transaction_status_timeout, name="c2b_transaction_status_timeout"),
+	path("transaction-status/timeout/", views.transaction_status_timeout),
+
 	# C2B URL registration and callbacks
 	path("register", views.register_urls, name="c2b_register"),
 	path("register/", views.register_urls),
@@ -23,6 +31,8 @@ urlpatterns = [
 	# Transactions (service-scoped aliases)
 	path("transactions/all", views.transactions_all, name="c2b_transactions_all"),
 	path("transactions/all/", views.transactions_all),
+	path("transactions/aggregate", views.transactions_aggregate, name="c2b_transactions_aggregate"),
+	path("transactions/aggregate/", views.transactions_aggregate),
 	path(
 		"transactions/completed",
 		views.transactions_completed,

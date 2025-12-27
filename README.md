@@ -97,6 +97,15 @@ Key variables:
 - `STK_CALLBACK_URL`, `CONFIRMATION_URL`, `VALIDATION_URL`
 - `MPESA_QR_CODE_URL` (M-Pesa QR code generation endpoint)
 - `MPESA_RATIBA_URL` (M-Pesa Ratiba standing order endpoint)
+- Transaction Status Query (reconciliation):
+  - `MPESA_TXN_STATUS_QUERY_URL`
+  - `MPESA_TXN_STATUS_INITIATOR_NAME`, `MPESA_TXN_STATUS_SECURITY_CREDENTIAL`
+  - `MPESA_TXN_STATUS_RESULT_URL`, `MPESA_TXN_STATUS_TIMEOUT_URL`
+  - `MPESA_TXN_STATUS_PARTY_A`, `MPESA_TXN_STATUS_IDENTIFIER_TYPE`
+
+Bootstrap (optional):
+
+- `BOOTSTRAP_SUPERUSER_TOKEN` (guards first-superuser bootstrap)
 
 Note on credentials provisioning:
 
@@ -119,11 +128,14 @@ Token endpoint:
 Scopes (space-separated):
 
 - `transactions:read`
+- `transactions:write`
 - `c2b:write`
 - `qr:write`
 - `ratiba:write`
 - `b2c:write`
 - `b2b:write`
+- `business:read`
+- `business:write`
 
 Protected “gateway” endpoints require an OAuth2 token with the appropriate scope.
 
@@ -194,6 +206,11 @@ POST /api/v1/c2b/confirmation
 POST /api/v1/c2b/validation
 POST /api/v1/stk/callback
 POST /api/v1/stk/error
+POST /api/v1/c2b/transaction-status/query
+POST /api/v1/c2b/transaction-status/result
+POST /api/v1/c2b/transaction-status/timeout
+GET  /api/v1/business/onboarding
+POST /api/v1/business/onboarding
 GET  /api/v1/transactions/all
 GET  /api/v1/transactions/completed
 
@@ -240,6 +257,8 @@ GET  /api/v1/ratiba/<order_id>
 # Maintainer (superuser)
 GET  /api/v1/maintainer/clients
 POST /api/v1/maintainer/clients
+GET  /api/v1/maintainer/clients/<client_id>/business
+POST /api/v1/maintainer/clients/<client_id>/business
 POST /api/v1/maintainer/clients/<client_id>/rotate-secret
 POST /api/v1/maintainer/clients/<client_id>/revoke
 ```
@@ -251,6 +270,17 @@ See `USAGE.md` for:
 - Getting an OAuth2 access token (client_credentials) and scopes
 - Sample curl requests
 - ngrok workflow tips and troubleshooting
+
+## Frontend env (.env)
+
+The dashboard is a Vite app. Use the template:
+
+- `frontend/.env.example` (copy to `frontend/.env.local`)
+
+Key vars:
+
+- `VITE_API_BASE_URL`
+- `VITE_OAUTH_ACCESS_TOKEN` (optional)
 
 ## Contributing
 
