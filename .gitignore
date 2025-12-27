@@ -34,6 +34,10 @@ eggs/
 .eggs/
 lib/
 lib64/
+
+# Frontend source uses a "lib" folder that must be versioned.
+!frontend/src/lib/
+!frontend/src/lib/**
 parts/
 sdist/
 var/
@@ -185,6 +189,10 @@ cython_debug/
 [Ss]cripts
 pyvenv.cfg
 pip-selfcheck.json
+
+# Keep frontend source folders named "lib" tracked.
+!frontend/src/lib/
+!frontend/src/lib/**
 
 ### VisualStudioCode ###
 .vscode/*

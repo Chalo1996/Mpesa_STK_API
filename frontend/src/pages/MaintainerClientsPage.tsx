@@ -1,6 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { apiRequest } from "../lib/api";
 import { JsonViewer } from "../components/JsonViewer";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
 
 type ClientRow = {
   client_id: string;
@@ -13,12 +17,12 @@ type ClientRow = {
 export function MaintainerClientsPage() {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<number | null>(null);
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<unknown>(null);
 
   const [clients, setClients] = useState<ClientRow[]>([]);
   const [newName, setNewName] = useState("");
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     setLoading(true);
     setStatus(null);
 
@@ -28,13 +32,15 @@ export function MaintainerClientsPage() {
       });
       setStatus(result.status);
       setData(result.data);
-      setClients(
-        Array.isArray(result.data?.results) ? result.data.results : []
-      );
+      const results =
+        isRecord(result.data) && Array.isArray(result.data["results"])
+          ? (result.data["results"] as unknown[])
+          : [];
+      setClients(results as ClientRow[]);
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   async function createClient() {
     const name = newName.trim();
@@ -100,9 +106,8 @@ export function MaintainerClientsPage() {
   }
 
   useEffect(() => {
-    refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    void refresh();
+  }, [refresh]);
 
   return (
     <section className='page'>

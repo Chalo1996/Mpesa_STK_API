@@ -1,7 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiRequest } from "../lib/api";
 
 type TransactionRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function getErrorString(data: unknown): string {
+  if (!isRecord(data)) return "";
+  const err = data["error"];
+  return typeof err === "string" ? err : "";
+}
 
 function normalize(value: unknown): string {
   if (value === null || value === undefined) return "";
@@ -18,71 +28,78 @@ export function TransactionsPage() {
   const [mode, setMode] = useState<"all" | "completed">("all");
   const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
 
-  async function fetchTransactions(selectedMode: "all" | "completed") {
-    setLoading(true);
-    setStatus(null);
-    setError("");
+  const fetchTransactions = useCallback(
+    async (selectedMode: "all" | "completed") => {
+      setLoading(true);
+      setStatus(null);
+      setError("");
 
-    try {
-      const path =
-        selectedMode === "completed"
-          ? "/api/v1/c2b/transactions/completed"
-          : "/api/v1/c2b/transactions/all";
-      const result = await apiRequest(path, { method: "GET" });
-      setStatus(result.status);
+      try {
+        const path =
+          selectedMode === "completed"
+            ? "/api/v1/c2b/transactions/completed"
+            : "/api/v1/c2b/transactions/all";
+        const result = await apiRequest(path, { method: "GET" });
+        setStatus(result.status);
 
-      if (result.status >= 200 && result.status < 300) {
-        const list = Array.isArray(result.data?.transactions)
-          ? result.data.transactions
-          : [];
-        setTransactions(list);
-      } else {
-        setTransactions([]);
-        const apiError =
-          typeof result.data === "object" && result.data
-            ? String((result.data as any).error || "")
-            : "";
-
-        if (result.status === 401 && apiError === "Missing API key") {
-          setError("Please sign in with a staff account to view transactions.");
-        } else if (
-          result.status === 401 &&
-          apiError === "Authentication required"
-        ) {
-          setError("Please sign in with a staff account to view transactions.");
-        } else if (
-          result.status === 403 &&
-          apiError === "Staff access required"
-        ) {
-          setError(
-            "Staff access required. Please sign in with a staff account."
-          );
+        if (result.status >= 200 && result.status < 300) {
+          const tx = isRecord(result.data)
+            ? result.data["transactions"]
+            : undefined;
+          const list = Array.isArray(tx) ? (tx as TransactionRecord[]) : [];
+          setTransactions(list);
         } else {
-          setError(
-            typeof result.data === "object"
-              ? JSON.stringify(result.data)
-              : String(result.data || "Request failed")
-          );
+          setTransactions([]);
+          const apiError = getErrorString(result.data);
+
+          if (result.status === 401 && apiError === "Missing API key") {
+            setError(
+              "Please sign in with a staff account to view transactions."
+            );
+          } else if (
+            result.status === 401 &&
+            apiError === "Authentication required"
+          ) {
+            setError(
+              "Please sign in with a staff account to view transactions."
+            );
+          } else if (
+            result.status === 403 &&
+            apiError === "Staff access required"
+          ) {
+            setError(
+              "Staff access required. Please sign in with a staff account."
+            );
+          } else {
+            setError(
+              typeof result.data === "object"
+                ? JSON.stringify(result.data)
+                : String(result.data || "Request failed")
+            );
+          }
         }
+      } finally {
+        setLoading(false);
       }
-    } finally {
-      setLoading(false);
-    }
-  }
+    },
+    []
+  );
 
   useEffect(() => {
-    fetchTransactions(mode);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode]);
+    void fetchTransactions(mode);
+  }, [mode, fetchTransactions]);
 
   useEffect(() => {
     const handler = () => {
-      fetchTransactions(mode);
+      void fetchTransactions(mode);
     };
     window.addEventListener("mpesa-auth-changed", handler);
     return () => window.removeEventListener("mpesa-auth-changed", handler);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode]);
+  }, [mode, fetchTransactions]);
+
+  function parseMode(value: string): "all" | "completed" {
+    return value === "completed" ? "completed" : "all";
+  }
 
   const columns = useMemo(() => {
     const keys = new Set<string>();
@@ -104,7 +121,7 @@ export function TransactionsPage() {
         <select
           className='select'
           value={mode}
-          onChange={(e) => setMode(e.target.value as any)}
+          onChange={(e) => setMode(parseMode(e.target.value))}
         >
           <option value='all'>All</option>
           <option value='completed'>Completed</option>

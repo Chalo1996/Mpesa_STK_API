@@ -10,9 +10,13 @@ type BatchSummary = {
   created_at?: string;
 };
 
-function safeJsonParse(text: string): any {
+function safeJsonParse(text: string): unknown {
   if (!text.trim()) return null;
   return JSON.parse(text);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 export function B2bBulkPage() {
@@ -31,11 +35,11 @@ export function B2bBulkPage() {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<number | null>(null);
   const [error, setError] = useState<string>("");
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<unknown>(null);
 
   const [batches, setBatches] = useState<BatchSummary[]>([]);
   const [selectedBatchId, setSelectedBatchId] = useState<string>("");
-  const [detail, setDetail] = useState<any>(null);
+  const [detail, setDetail] = useState<unknown>(null);
 
   async function refreshList() {
     const res = await apiRequest("/api/v1/b2b/bulk/list?limit=50", {
@@ -73,18 +77,21 @@ export function B2bBulkPage() {
     setData(null);
 
     try {
-      let items: any = null;
+      let parsed: unknown = null;
       try {
-        items = safeJsonParse(itemsText);
-      } catch (e: any) {
-        setError(`Invalid JSON: ${String(e?.message || e)}`);
+        parsed = safeJsonParse(itemsText);
+      } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : String(e);
+        setError(`Invalid JSON: ${message}`);
         return;
       }
 
-      if (!Array.isArray(items) || items.length === 0) {
+      if (!Array.isArray(parsed) || parsed.length === 0) {
         setError("Items must be a non-empty JSON array.");
         return;
       }
+
+      const items = parsed as unknown[];
 
       const payload = {
         reference: reference.trim(),
@@ -100,7 +107,11 @@ export function B2bBulkPage() {
       setData(res.data);
 
       if (res.status >= 200 && res.status < 300) {
-        const batchId = String(res.data?.batch?.id || "");
+        const batchObj = isRecord(res.data) ? res.data["batch"] : undefined;
+        const batchId =
+          isRecord(batchObj) && typeof batchObj["id"] === "string"
+            ? (batchObj["id"] as string)
+            : "";
         if (batchId) {
           setSelectedBatchId(batchId);
           await fetchDetail(batchId);
@@ -108,8 +119,8 @@ export function B2bBulkPage() {
         await refreshList();
       } else {
         const apiError =
-          typeof res.data === "object" && res.data
-            ? String(res.data.error || "")
+          isRecord(res.data) && typeof res.data["error"] === "string"
+            ? (res.data["error"] as string)
             : "";
         if (res.status === 401 && apiError === "Missing API key") {
           setError(

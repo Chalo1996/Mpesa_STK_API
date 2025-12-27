@@ -10,7 +10,7 @@ export function RatibaPage() {
 
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<number | null>(null);
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<unknown>(null);
   const [lookupId, setLookupId] = useState("");
 
   const [standingOrderName, setStandingOrderName] = useState(

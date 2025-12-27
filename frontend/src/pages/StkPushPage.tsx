@@ -4,6 +4,18 @@ import { useNavigate } from "react-router-dom";
 import { apiRequest } from "../lib/api";
 import { JsonViewer } from "../components/JsonViewer";
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function getStringField(obj: unknown, key: string): string {
+  if (!isRecord(obj)) return "";
+  const value = obj[key];
+  if (typeof value === "string") return value;
+  if (value === null || value === undefined) return "";
+  return String(value);
+}
+
 export function StkPushPage() {
   const navigate = useNavigate();
 
@@ -13,7 +25,7 @@ export function StkPushPage() {
 
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<number | null>(null);
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<unknown>(null);
   const [waitingForCallback, setWaitingForCallback] = useState(false);
   const pollTimerRef = useRef<number | null>(null);
 
@@ -57,15 +69,14 @@ export function StkPushPage() {
         return;
       }
 
-      const rows: any[] = Array.isArray(res.data?.transactions)
-        ? res.data.transactions
-        : [];
+      const tx = isRecord(res.data) ? res.data["transactions"] : undefined;
+      const rows: unknown[] = Array.isArray(tx) ? (tx as unknown[]) : [];
 
       const merchantRequestId = (ids.merchantRequestId || "").trim();
       const checkoutRequestId = (ids.checkoutRequestId || "").trim();
       const matched = rows.find((r) => {
-        const rowMerchantRequestId = String(r?.merchant_request_id ?? "");
-        const rowCheckoutRequestId = String(r?.checkout_request_id ?? "");
+        const rowMerchantRequestId = getStringField(r, "merchant_request_id");
+        const rowCheckoutRequestId = getStringField(r, "checkout_request_id");
         if (merchantRequestId && rowMerchantRequestId === merchantRequestId)
           return true;
         if (checkoutRequestId && rowCheckoutRequestId === checkoutRequestId)
@@ -95,7 +106,7 @@ export function StkPushPage() {
     setWaitingForCallback(false);
     clearPoll();
 
-    const payload: any = {
+    const payload: Record<string, unknown> = {
       amount: Number(amount || "0") || 1,
       phone_number: phoneNumber.trim(),
     };
@@ -111,10 +122,12 @@ export function StkPushPage() {
 
       // If this looks like a successful STK push initiation, poll transactions
       // until the callback has been persisted, then redirect to Transactions.
-      const merchantRequestId =
-        result.data?.MerchantRequestID || result.data?.merchant_request_id;
-      const checkoutRequestId =
-        result.data?.CheckoutRequestID || result.data?.checkout_request_id;
+      const merchantRequestId = isRecord(result.data)
+        ? result.data["MerchantRequestID"] ?? result.data["merchant_request_id"]
+        : undefined;
+      const checkoutRequestId = isRecord(result.data)
+        ? result.data["CheckoutRequestID"] ?? result.data["checkout_request_id"]
+        : undefined;
       if (
         result.status >= 200 &&
         result.status < 300 &&

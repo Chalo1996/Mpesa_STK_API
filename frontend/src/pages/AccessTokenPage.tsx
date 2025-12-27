@@ -7,10 +7,14 @@ import {
 } from "../lib/api";
 import { JsonViewer } from "../components/JsonViewer";
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 export function AccessTokenPage() {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<number | null>(null);
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<unknown>(null);
 
   const [oauthToken, setOauthToken] = useState("");
 
@@ -87,8 +91,8 @@ export function AccessTokenPage() {
       setData(result.data);
 
       const token =
-        typeof result.data?.access_token === "string"
-          ? result.data.access_token
+        isRecord(result.data) && typeof result.data["access_token"] === "string"
+          ? (result.data["access_token"] as string)
           : "";
       if (result.status >= 200 && result.status < 300 && token) {
         setOauthToken(token);

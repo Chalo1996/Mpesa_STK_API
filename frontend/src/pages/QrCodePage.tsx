@@ -2,10 +2,14 @@ import { useState } from "react";
 import { apiRequest } from "../lib/api";
 import { JsonViewer } from "../components/JsonViewer";
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 export function QrCodePage() {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<number | null>(null);
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<unknown>(null);
 
   const [merchantName, setMerchantName] = useState("My Shop");
   const [refNo, setRefNo] = useState("INV-001");
@@ -20,7 +24,7 @@ export function QrCodePage() {
     setData(null);
 
     try {
-      const payload: any = {
+      const payload: Record<string, unknown> = {
         MerchantName: merchantName.trim(),
         RefNo: refNo.trim(),
         Amount: Number(amount || "0") || 0,
@@ -41,7 +45,9 @@ export function QrCodePage() {
   }
 
   const qrBase64 =
-    typeof data?.QRCode === "string" && data.QRCode ? data.QRCode : "";
+    isRecord(data) && typeof data["QRCode"] === "string" && data["QRCode"]
+      ? (data["QRCode"] as string)
+      : "";
 
   return (
     <section className='page'>
