@@ -9,6 +9,7 @@ import { B2cBulkPage } from "./pages/B2cBulkPage";
 import { QrCodePage } from "./pages/QrCodePage";
 import { RatibaPage } from "./pages/RatibaPage";
 import { MaintainerClientsPage } from "./pages/MaintainerClientsPage";
+import { MaintainerBusinessesPage } from "./pages/MaintainerBusinessesPage";
 import { RegisterC2BPage } from "./pages/RegisterC2BPage";
 import { StkErrorsLogPage } from "./pages/StkErrorsLogPage";
 import { StkPushPage } from "./pages/StkPushPage";
@@ -93,6 +94,14 @@ function App() {
             Maintainer
           </NavLink>
           <NavLink
+            to='/maintainer/businesses'
+            className={({ isActive }) =>
+              isActive ? "nav__link nav__link--active" : "nav__link"
+            }
+          >
+            Businesses
+          </NavLink>
+          <NavLink
             to='/logs/calls'
             className={({ isActive }) =>
               isActive ? "nav__link nav__link--active" : "nav__link"
@@ -134,6 +143,10 @@ function App() {
           <Route
             path='/maintainer/clients'
             element={<MaintainerClientsPage />}
+          />
+          <Route
+            path='/maintainer/businesses'
+            element={<MaintainerBusinessesPage />}
           />
           <Route path='/logs/calls' element={<CallsLogPage />} />
           <Route path='/logs/callbacks' element={<CallbacksLogPage />} />
