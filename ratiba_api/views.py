@@ -1,9 +1,11 @@
 import os
 import re
+import uuid
 
 import requests
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
 from mpesa_api.mpesa_credentials import MpesaC2bCredential
@@ -26,11 +28,49 @@ def _serialize_order(order: RatibaOrder, include_payloads: bool = False):
         "created_at": order.created_at.isoformat() if order.created_at else None,
         "response_status": order.response_status,
         "error": order.error or "",
+        "callback_received_at": order.callback_received_at.isoformat() if order.callback_received_at else None,
+        "callback_result_code": order.callback_result_code,
+        "callback_result_description": order.callback_result_description or "",
     }
     if include_payloads:
         data["request_payload"] = order.request_payload
         data["response_payload"] = order.response_payload
+        data["callback_payload"] = order.callback_payload
     return data
+
+
+def _extract_account_reference(payload: dict) -> str:
+    if not isinstance(payload, dict):
+        return ""
+    for key in ("AccountReference", "accountReference", "account_reference"):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
+def _extract_result_code(payload: dict):
+    if not isinstance(payload, dict):
+        return None
+    for key in ("ResultCode", "resultCode", "result_code"):
+        value = payload.get(key)
+        if value is None:
+            continue
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def _extract_result_desc(payload: dict) -> str:
+    if not isinstance(payload, dict):
+        return ""
+    for key in ("ResultDesc", "ResultDescription", "resultDesc", "resultDescription", "result_desc"):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
 
 
 _DATE_YYYYMMDD_RE = re.compile(r"^\d{8}$")
@@ -123,7 +163,7 @@ def create_ratiba(request):
 
     try:
         resp = requests.post(api_url, json=payload, headers=headers, timeout=30)
-    except Exception as e:
+    except requests.RequestException as e:
         RatibaOrder.objects.create(
             ip_address=request.META.get("REMOTE_ADDR"),
             requested_by=_maybe_user(request),
@@ -136,7 +176,7 @@ def create_ratiba(request):
 
     try:
         data = resp.json()
-    except Exception:
+    except ValueError:
         data = {"raw": (resp.text or "")}
 
     RatibaOrder.objects.create(
@@ -149,6 +189,79 @@ def create_ratiba(request):
     )
 
     return JsonResponse(data, status=resp.status_code)
+
+
+@csrf_exempt
+def ratiba_callback(request):
+    """Receive Ratiba standing order callback from M-Pesa.
+
+    This endpoint is intentionally unauthenticated/CSRF-exempt so Safaricom can reach it.
+    It updates the most relevant `RatibaOrder` record when possible.
+
+    Matching strategy:
+    - If query param `order_id=<uuid>` is present, update that order.
+    - Else, try to match by `AccountReference` in the callback payload.
+    """
+
+    if request.method != "POST":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+
+    payload = json_body(request)
+    if not isinstance(payload, dict):
+        payload = {}
+
+    matched_order = None
+
+    raw_order_id = str(request.GET.get("order_id") or "").strip()
+    if raw_order_id:
+        try:
+            order_uuid = uuid.UUID(raw_order_id)
+            matched_order = RatibaOrder.objects.filter(id=order_uuid).first()
+        except ValueError:
+            matched_order = None
+
+    if matched_order is None:
+        account_ref = _extract_account_reference(payload)
+        if account_ref:
+            matched_order = (
+                RatibaOrder.objects.filter(request_payload__AccountReference=account_ref)
+                .order_by("-created_at")
+                .first()
+            )
+
+    result_code = _extract_result_code(payload)
+    result_desc = _extract_result_desc(payload)
+
+    if matched_order is None:
+        RatibaOrder.objects.create(
+            ip_address=request.META.get("REMOTE_ADDR"),
+            requested_by=_maybe_user(request),
+            request_payload={},
+            response_status=None,
+            response_payload={},
+            callback_received_at=timezone.now(),
+            callback_result_code=result_code,
+            callback_result_description=result_desc,
+            callback_payload=payload,
+            error="Unmatched Ratiba callback (no related order found)",
+        )
+        return JsonResponse({"ResultCode": 0, "ResultDesc": "Accepted"}, status=200)
+
+    matched_order.callback_received_at = timezone.now()
+    matched_order.callback_result_code = result_code
+    matched_order.callback_result_description = result_desc
+    matched_order.callback_payload = payload
+    matched_order.save(
+        update_fields=[
+            "callback_received_at",
+            "callback_result_code",
+            "callback_result_description",
+            "callback_payload",
+            "updated_at",
+        ]
+    )
+
+    return JsonResponse({"ResultCode": 0, "ResultDesc": "Accepted"}, status=200)
 
 
 @require_staff

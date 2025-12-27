@@ -3,6 +3,11 @@ import { apiRequest } from "../lib/api";
 import { JsonViewer } from "../components/JsonViewer";
 
 export function RatibaPage() {
+  const defaultCallbackUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/api/v1/ratiba/callback`
+      : "/api/v1/ratiba/callback";
+
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<number | null>(null);
   const [data, setData] = useState<any>(null);
@@ -21,8 +26,8 @@ export function RatibaPage() {
     useState("4");
   const [amount, setAmount] = useState("4500");
   const [partyA, setPartyA] = useState("254708374149");
-  const [callBackURL, setCallBackURL] = useState("https://mydomain.com/pat");
-  const [accountReference, setAccountReference] = useState("Test");
+  const [callBackURL, setCallBackURL] = useState(defaultCallbackUrl);
+  const [accountReference, setAccountReference] = useState("Test-001");
   const [transactionDesc, setTransactionDesc] = useState("Test");
   const [frequency, setFrequency] = useState("2");
 

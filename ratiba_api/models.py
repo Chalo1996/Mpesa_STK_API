@@ -24,6 +24,12 @@ class RatibaOrder(BaseModel):
     response_payload = models.JSONField(default=dict)
     error = models.TextField(blank=True)
 
+    # Ratiba callback (asynchronous) details
+    callback_received_at = models.DateTimeField(blank=True, null=True)
+    callback_result_code = models.IntegerField(blank=True, null=True)
+    callback_result_description = models.TextField(blank=True)
+    callback_payload = models.JSONField(default=dict)
+
     class Meta:
         verbose_name = "Ratiba Order"
         verbose_name_plural = "Ratiba Orders"

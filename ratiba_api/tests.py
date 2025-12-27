@@ -100,3 +100,26 @@ class RatibaApiTests(TestCase):
         resp = self.client.get("/api/v1/ratiba/history")
         self.assertEqual(resp.status_code, 200)
         self.assertIn("results", resp.json())
+
+    def test_callback_is_csrf_exempt_and_updates_order(self):
+        order = RatibaOrder.objects.create(request_payload={"AccountReference": "AR-CB-1"})
+
+        payload = {
+            "AccountReference": "AR-CB-1",
+            "ResultCode": 0,
+            "ResultDesc": "Standing order registered",
+            "Extra": "value",
+        }
+
+        resp = self.client.post(
+            "/api/v1/ratiba/callback",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+
+        order.refresh_from_db()
+        self.assertIsNotNone(order.callback_received_at)
+        self.assertEqual(order.callback_result_code, 0)
+        self.assertEqual(order.callback_result_description, "Standing order registered")
+        self.assertEqual(order.callback_payload.get("Extra"), "value")

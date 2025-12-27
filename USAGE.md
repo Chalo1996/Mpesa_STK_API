@@ -14,14 +14,14 @@ make migrations
 make run
 ```
 
-2. Create a staff user (superuser):
+1. Create a staff user (superuser):
 
 ```bash
 source .venv/bin/activate
 make superuser
 ```
 
-3. Start the dashboard:
+1. Start the dashboard:
 
 ```bash
 cd frontend
@@ -217,6 +217,12 @@ curl -X POST http://127.0.0.1:8000/api/v1/qr/generate \
 
 ## 6c) Create a Ratiba Standing Order
 
+Notes:
+
+- `CallBackURL` must be a **publicly reachable URL** that Safaricom can POST to.
+- Use the built-in callback endpoint: `POST /api/v1/ratiba/callback`.
+- Correlation: this app matches callbacks to orders primarily via `AccountReference`, so make it unique per standing order.
+
 ```bash
 curl -X POST http://127.0.0.1:8000/api/v1/ratiba/create \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
@@ -230,8 +236,8 @@ curl -X POST http://127.0.0.1:8000/api/v1/ratiba/create \
     "ReceiverPartyIdentifierType":"4",
     "Amount":"4500",
     "PartyA":"254708374149",
-    "CallBackURL":"https://example.invalid/pat",
-    "AccountReference":"Test",
+    "CallBackURL":"https://<your-public-host>/api/v1/ratiba/callback",
+    "AccountReference":"Test-001",
     "TransactionDesc":"Test",
     "Frequency":"2"
   }'
@@ -275,6 +281,16 @@ Confirmation:
 curl -i -X POST https://<ngrok-host>/api/v1/c2b/confirmation \
   -H "Content-Type: application/json" \
   -d '{"TransID":"T1","TransAmount":1,"MSISDN":"254700000000","TransTime":"20251225120000"}'
+
+```
+
+Ratiba callback:
+
+```bash
+curl -i -X POST https://<ngrok-host>/api/v1/ratiba/callback \
+  -H "Content-Type: application/json" \
+  -d '{"AccountReference":"Test-001","ResultCode":0,"ResultDesc":"Accepted"}'
+
 ```
 
 ## 8) Run tests
