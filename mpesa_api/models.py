@@ -12,6 +12,20 @@ class BaseModel(models.Model):
 
 class MpesaCalls(BaseModel):
     """Stores all M-Pesa API call logs"""
+    business = models.ForeignKey(
+        "business_api.Business",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="mpesa_calls",
+    )
+    shortcode = models.ForeignKey(
+        "business_api.MpesaShortcode",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="mpesa_calls",
+    )
     ip_address = models.GenericIPAddressField()
     caller = models.TextField()
     conversation_id = models.TextField(blank=True, null=True, db_index=True)
@@ -27,6 +41,20 @@ class MpesaCalls(BaseModel):
 
 class MpesaPayment(BaseModel):
     """Stores completed or failed STK push payments"""
+    business = models.ForeignKey(
+        "business_api.Business",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="mpesa_payments",
+    )
+    shortcode = models.ForeignKey(
+        "business_api.MpesaShortcode",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="mpesa_payments",
+    )
     merchant_request_id = models.CharField(max_length=100, blank=True, null=True)
     checkout_request_id = models.CharField(max_length=100, blank=True, null=True)
     transaction_id = models.CharField(max_length=100, blank=True, null=True)
@@ -47,6 +75,20 @@ class MpesaPayment(BaseModel):
 
 class MpesaCallBacks(BaseModel):
     """Stores callback responses from M-Pesa"""
+    business = models.ForeignKey(
+        "business_api.Business",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="mpesa_callbacks",
+    )
+    shortcode = models.ForeignKey(
+        "business_api.MpesaShortcode",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="mpesa_callbacks",
+    )
     ip_address = models.GenericIPAddressField(blank=True, null=True)
     caller = models.CharField(max_length=50)
     conversation_id = models.CharField(max_length=100, blank=True, null=True)
@@ -56,6 +98,40 @@ class MpesaCallBacks(BaseModel):
 
     def __str__(self):
         return f"Callback - {self.conversation_id}"
+
+
+class StkPushInitiation(BaseModel):
+    """Maps STK push initiation response IDs back to a business/shortcode.
+
+    STK callbacks do not reliably include BusinessShortCode, so we persist the
+    CheckoutRequestID at initiation time and use it to resolve tenancy later.
+    """
+
+    business = models.ForeignKey(
+        "business_api.Business",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="stk_push_initiations",
+    )
+    shortcode = models.ForeignKey(
+        "business_api.MpesaShortcode",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="stk_push_initiations",
+    )
+
+    merchant_request_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+    checkout_request_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+    account_reference = models.CharField(max_length=64, blank=True, default="")
+
+    request_payload = models.JSONField(default=dict, blank=True)
+    response_payload = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
 
 
 class StkPushCallback(BaseModel):
