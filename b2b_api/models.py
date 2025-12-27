@@ -50,3 +50,51 @@ class BulkBusinessPaymentItem(models.Model):
 
 	def __str__(self) -> str:
 		return f"B2B Item {self.id} -> {self.recipient} ({self.amount} {self.currency})"
+
+
+class B2BUSSDPushRequest(models.Model):
+	"""Tracks a single B2B USSD push request and the resulting callback payload."""
+
+	STATUS_QUEUED = "queued"
+	STATUS_SUBMITTED = "submitted"
+	STATUS_SUCCESS = "success"
+	STATUS_CANCELLED = "cancelled"
+	STATUS_FAILED = "failed"
+	STATUS_ERROR = "error"
+
+	id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	business = models.ForeignKey(
+		"business_api.Business",
+		on_delete=models.CASCADE,
+		related_name="b2b_ussd_push_requests",
+	)
+
+	environment = models.CharField(max_length=20, blank=True, default="")
+
+	request_ref_id = models.CharField(max_length=100, unique=True)
+	response_code = models.CharField(max_length=50, blank=True, default="")
+	response_status = models.TextField(blank=True, default="")
+
+	status = models.CharField(max_length=20, default=STATUS_QUEUED)
+
+	request_payload = models.JSONField(default=dict, blank=True)
+	api_response_payload = models.JSONField(default=dict, blank=True)
+	api_error_payload = models.JSONField(default=dict, blank=True)
+
+	callback_payload = models.JSONField(default=dict, blank=True)
+	result_code = models.CharField(max_length=50, blank=True, default="")
+	result_desc = models.TextField(blank=True, default="")
+	amount = models.CharField(max_length=30, blank=True, default="")
+	payment_reference = models.CharField(max_length=120, blank=True, default="")
+	conversation_id = models.CharField(max_length=120, blank=True, default="")
+	transaction_id = models.CharField(max_length=120, blank=True, default="")
+	callback_status = models.CharField(max_length=40, blank=True, default="")
+
+	class Meta:
+		ordering = ["-created_at"]
+
+	def __str__(self) -> str:
+		return f"B2B USSD Push {self.request_ref_id} ({self.status})"

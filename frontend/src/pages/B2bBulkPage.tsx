@@ -20,6 +20,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function B2bBulkPage() {
+  const [mode, setMode] = useState<"bulk" | "single">("bulk");
+  const [businessId, setBusinessId] = useState("");
+
+  const [singlePrimaryShortCode, setSinglePrimaryShortCode] =
+    useState("000001");
+  const [singleReceiverShortCode, setSingleReceiverShortCode] =
+    useState("000002");
+  const [singleAmount, setSingleAmount] = useState("100");
+  const [singlePaymentRef, setSinglePaymentRef] = useState("paymentRef");
+  const [singlePartnerName, setSinglePartnerName] = useState("Vendor");
+  const [singleCallbackUrl, setSingleCallbackUrl] = useState("");
+  const [singleStatus, setSingleStatus] = useState<number | null>(null);
+  const [singleError, setSingleError] = useState<string>("");
+  const [singleData, setSingleData] = useState<unknown>(null);
+
   const [reference, setReference] = useState("B2B-001");
   const [itemsText, setItemsText] = useState(
     JSON.stringify(
@@ -98,6 +113,7 @@ export function B2bBulkPage() {
       const items = parsed as unknown[];
 
       const payload = {
+        business_id: businessId.trim(),
         reference: reference.trim(),
         items,
       };
@@ -143,124 +159,277 @@ export function B2bBulkPage() {
     }
   }
 
+  async function submitSingle() {
+    setSingleStatus(null);
+    setSingleError("");
+    setSingleData(null);
+
+    const payload = {
+      business_id: businessId.trim(),
+      primary_short_code: singlePrimaryShortCode.trim(),
+      receiver_short_code: singleReceiverShortCode.trim(),
+      amount: singleAmount.trim(),
+      payment_ref: singlePaymentRef.trim(),
+      partner_name: singlePartnerName.trim(),
+      callback_url: singleCallbackUrl.trim(),
+    };
+
+    const res = await apiRequest("/api/v1/b2b/single", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+
+    setSingleStatus(res.status);
+    setSingleData(res.data);
+    if (res.status < 200 || res.status >= 300) {
+      const apiError =
+        isRecord(res.data) && typeof res.data["error"] === "string"
+          ? (res.data["error"] as string)
+          : "";
+      if (res.status === 401 && apiError === "Missing API key") {
+        setSingleError("Please sign in with a staff account to submit B2B.");
+      } else {
+        setSingleError(
+          typeof res.data === "object"
+            ? JSON.stringify(res.data)
+            : String(res.data || "Request failed")
+        );
+      }
+    }
+  }
+
   return (
     <section className='page'>
-      <h1 className='page__title'>B2B Bulk</h1>
-      <p className='page__desc'>
-        Calls <code>/api/v1/b2b/bulk</code> (protected).
-      </p>
+      <h1 className='page__title'>B2B</h1>
+      <p className='page__desc'>Choose single or bulk transaction.</p>
 
       <div className='form'>
         <label className='label'>
-          Batch reference (optional)
-          <input
+          Transaction type
+          <select
             className='input'
-            value={reference}
-            onChange={(e) => setReference(e.target.value)}
-          />
+            value={mode}
+            onChange={(e) =>
+              setMode(e.target.value === "single" ? "single" : "bulk")
+            }
+          >
+            <option value='bulk'>Bulk</option>
+            <option value='single'>Single</option>
+          </select>
         </label>
 
         <label className='label'>
-          Items (JSON array)
-          <textarea
+          Business ID (required)
+          <input
             className='input'
-            style={{ minHeight: 160 }}
-            value={itemsText}
-            onChange={(e) => setItemsText(e.target.value)}
+            value={businessId}
+            onChange={(e) => setBusinessId(e.target.value)}
+            placeholder='UUID…'
           />
         </label>
-
-        <div className='actions'>
-          <button
-            className='button'
-            type='button'
-            onClick={submit}
-            disabled={loading}
-          >
-            {loading ? "Submitting…" : "Create batch"}
-          </button>
-          <button
-            className='button'
-            type='button'
-            onClick={refreshList}
-            disabled={loading}
-          >
-            Refresh list
-          </button>
-          {status !== null ? (
-            <span className='badge'>HTTP {status}</span>
-          ) : null}
-        </div>
       </div>
 
-      {error ? <div className='error'>{error}</div> : null}
+      {mode === "single" ? (
+        <>
+          <h2 className='page__title' style={{ fontSize: 18 }}>
+            Single (USSD push)
+          </h2>
+          <div className='form'>
+            <label className='label'>
+              Primary Short Code
+              <input
+                className='input'
+                value={singlePrimaryShortCode}
+                onChange={(e) => setSinglePrimaryShortCode(e.target.value)}
+              />
+            </label>
 
-      <JsonViewer value={data} />
+            <label className='label'>
+              Receiver Short Code
+              <input
+                className='input'
+                value={singleReceiverShortCode}
+                onChange={(e) => setSingleReceiverShortCode(e.target.value)}
+              />
+            </label>
 
-      <h2 className='page__title' style={{ fontSize: 18 }}>
-        Recent batches
-      </h2>
-      <div className='actions'>
-        <input
-          className='input'
-          placeholder='Paste batch id to view…'
-          value={selectedBatchId}
-          onChange={(e) => setSelectedBatchId(e.target.value)}
-        />
-        <button
-          className='button'
-          type='button'
-          onClick={() => fetchDetail(selectedBatchId)}
-          disabled={!selectedBatchId.trim()}
-        >
-          View batch
-        </button>
-      </div>
+            <label className='label'>
+              Amount
+              <input
+                className='input'
+                value={singleAmount}
+                onChange={(e) => setSingleAmount(e.target.value)}
+              />
+            </label>
 
-      {batches.length === 0 ? (
-        <div className='muted'>No batches</div>
+            <label className='label'>
+              Payment Ref
+              <input
+                className='input'
+                value={singlePaymentRef}
+                onChange={(e) => setSinglePaymentRef(e.target.value)}
+              />
+            </label>
+
+            <label className='label'>
+              Partner Name
+              <input
+                className='input'
+                value={singlePartnerName}
+                onChange={(e) => setSinglePartnerName(e.target.value)}
+              />
+            </label>
+
+            <label className='label'>
+              Callback URL
+              <input
+                className='input'
+                value={singleCallbackUrl}
+                onChange={(e) => setSingleCallbackUrl(e.target.value)}
+                placeholder='https://.../api/v1/b2b/callback/result'
+              />
+            </label>
+
+            <div className='actions'>
+              <button
+                className='button'
+                type='button'
+                onClick={submitSingle}
+                disabled={!businessId.trim()}
+              >
+                Send single
+              </button>
+              {singleStatus !== null ? (
+                <span className='badge'>HTTP {singleStatus}</span>
+              ) : null}
+            </div>
+          </div>
+
+          {singleError ? <div className='error'>{singleError}</div> : null}
+          <JsonViewer value={singleData} />
+        </>
       ) : (
-        <div className='table-wrap'>
-          <table className='table'>
-            <thead>
-              <tr>
-                <th>id</th>
-                <th>reference</th>
-                <th>status</th>
-                <th>items</th>
-                <th>created_at</th>
-              </tr>
-            </thead>
-            <tbody>
-              {batches.map((b) => (
-                <tr key={b.id}>
-                  <td>
-                    <button
-                      className='button'
-                      type='button'
-                      onClick={() => {
-                        setSelectedBatchId(b.id);
-                        void fetchDetail(b.id);
-                      }}
-                    >
-                      {b.id}
-                    </button>
-                  </td>
-                  <td>{String(b.reference || "")}</td>
-                  <td>{String(b.status || "")}</td>
-                  <td>{String(b.items_count ?? "")}</td>
-                  <td>{String(b.created_at || "")}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+        <>
+          <h2 className='page__title' style={{ fontSize: 18 }}>
+            Bulk
+          </h2>
+          <p className='page__desc'>
+            Calls <code>/api/v1/b2b/bulk</code> (protected).
+          </p>
 
-      <h2 className='page__title' style={{ fontSize: 18 }}>
-        Batch detail
-      </h2>
-      <JsonViewer value={detail} />
+          <div className='form'>
+            <label className='label'>
+              Batch reference (optional)
+              <input
+                className='input'
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+              />
+            </label>
+
+            <label className='label'>
+              Items (JSON array)
+              <textarea
+                className='input'
+                style={{ minHeight: 160 }}
+                value={itemsText}
+                onChange={(e) => setItemsText(e.target.value)}
+              />
+            </label>
+
+            <div className='actions'>
+              <button
+                className='button'
+                type='button'
+                onClick={submit}
+                disabled={loading || !businessId.trim()}
+              >
+                {loading ? "Submitting…" : "Create batch"}
+              </button>
+              <button
+                className='button'
+                type='button'
+                onClick={refreshList}
+                disabled={loading}
+              >
+                Refresh list
+              </button>
+              {status !== null ? (
+                <span className='badge'>HTTP {status}</span>
+              ) : null}
+            </div>
+          </div>
+
+          {error ? <div className='error'>{error}</div> : null}
+
+          <JsonViewer value={data} />
+
+          <h2 className='page__title' style={{ fontSize: 18 }}>
+            Recent batches
+          </h2>
+          <div className='actions'>
+            <input
+              className='input'
+              placeholder='Paste batch id to view…'
+              value={selectedBatchId}
+              onChange={(e) => setSelectedBatchId(e.target.value)}
+            />
+            <button
+              className='button'
+              type='button'
+              onClick={() => fetchDetail(selectedBatchId)}
+              disabled={!selectedBatchId.trim()}
+            >
+              View batch
+            </button>
+          </div>
+
+          {batches.length === 0 ? (
+            <div className='muted'>No batches</div>
+          ) : (
+            <div className='table-wrap'>
+              <table className='table'>
+                <thead>
+                  <tr>
+                    <th>id</th>
+                    <th>reference</th>
+                    <th>status</th>
+                    <th>items</th>
+                    <th>created_at</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {batches.map((b) => (
+                    <tr key={b.id}>
+                      <td>
+                        <button
+                          className='button'
+                          type='button'
+                          onClick={() => {
+                            setSelectedBatchId(b.id);
+                            void fetchDetail(b.id);
+                          }}
+                        >
+                          {b.id}
+                        </button>
+                      </td>
+                      <td>{String(b.reference || "")}</td>
+                      <td>{String(b.status || "")}</td>
+                      <td>{String(b.items_count ?? "")}</td>
+                      <td>{String(b.created_at || "")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <h2 className='page__title' style={{ fontSize: 18 }}>
+            Batch detail
+          </h2>
+          <JsonViewer value={detail} />
+        </>
+      )}
     </section>
   );
 }

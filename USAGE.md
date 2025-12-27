@@ -117,6 +117,47 @@ Callbacks (called by Safaricom):
 - ResultURL: `POST /api/v1/b2c/callback/result`
 - QueueTimeOutURL: `POST /api/v1/b2c/callback/timeout`
 
+## B2B single (USSD push)
+
+This calls _your local API_, which then calls Safaricom’s USSD push API:
+
+- `POST https://sandbox.safaricom.co.ke/v1/ussdpush/get-msisdn`
+
+Required `.env` values for B2B single submission:
+
+```dotenv
+MPESA_B2B_USSD_API_URL=https://sandbox.safaricom.co.ke/v1/ussdpush/get-msisdn
+MPESA_B2B_CALLBACK_URL=https://<your-public-host>/api/v1/b2b/callback/result
+MPESA_B2B_PRIMARY_SHORT_CODE=000001
+MPESA_B2B_RECEIVER_SHORT_CODE=000002
+MPESA_B2B_PARTNER_NAME=Vendor
+MPESA_B2B_PAYMENT_REF=paymentRef
+
+# Token base URL override (optional)
+MPESA_DARAJA_API_BASE_URL=https://sandbox.safaricom.co.ke
+```
+
+Initiate a single USSD push request:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/b2b/single \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "business_id": "<BUSINESS_UUID>",
+    "primary_short_code": "000001",
+    "receiver_short_code": "000002",
+    "amount": "100",
+    "payment_ref": "paymentRef",
+    "partner_name": "Vendor",
+    "callback_url": "https://<your-public-host>/api/v1/b2b/callback/result"
+  }'
+```
+
+Callback (called by Safaricom):
+
+- ResultURL: `POST /api/v1/b2b/callback/result`
+
 ## 2) Start the app
 
 ```bash

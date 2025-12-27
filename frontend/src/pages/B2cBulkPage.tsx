@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { apiRequest } from "../lib/api";
 import { JsonViewer } from "../components/JsonViewer";
 
@@ -20,6 +20,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function B2cBulkPage() {
+  const [mode, setMode] = useState<"bulk" | "single">("bulk");
   const [businessId, setBusinessId] = useState("");
 
   const [singleRecipient, setSingleRecipient] = useState("254700000000");
@@ -51,7 +52,7 @@ export function B2cBulkPage() {
   const [selectedBatchId, setSelectedBatchId] = useState<string>("");
   const [detail, setDetail] = useState<unknown>(null);
 
-  async function refreshList() {
+  const refreshList = useCallback(async () => {
     const res = await apiRequest("/api/v1/b2c/bulk/list?limit=50", {
       method: "GET",
     });
@@ -62,23 +63,19 @@ export function B2cBulkPage() {
           : [];
       setBatches(results as BatchSummary[]);
     }
-  }
+  }, []);
 
-  async function fetchDetail(batchId: string) {
+  const fetchDetail = useCallback(async (batchId: string) => {
     if (!batchId.trim()) return;
     const res = await apiRequest(`/api/v1/b2c/bulk/${batchId.trim()}`, {
       method: "GET",
     });
-    if (res.status >= 200 && res.status < 300) {
-      setDetail(res.data);
-    } else {
-      setDetail(res.data);
-    }
-  }
+    setDetail(res.data);
+  }, []);
 
   useEffect(() => {
     void refreshList();
-  }, []);
+  }, [refreshList]);
 
   useEffect(() => {
     const handler = () => {
@@ -86,9 +83,9 @@ export function B2cBulkPage() {
     };
     window.addEventListener("mpesa-auth-changed", handler);
     return () => window.removeEventListener("mpesa-auth-changed", handler);
-  }, []);
+  }, [refreshList]);
 
-  async function submit() {
+  const submit = useCallback(async () => {
     setLoading(true);
     setStatus(null);
     setError("");
@@ -109,12 +106,10 @@ export function B2cBulkPage() {
         return;
       }
 
-      const items = parsed as unknown[];
-
       const payload = {
         business_id: businessId.trim(),
         reference: reference.trim(),
-        items,
+        items: parsed as unknown[],
       };
 
       const res = await apiRequest("/api/v1/b2c/bulk", {
@@ -156,9 +151,9 @@ export function B2cBulkPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [businessId, fetchDetail, itemsText, reference, refreshList]);
 
-  async function submitSingle() {
+  const submitSingle = useCallback(async () => {
     setSingleStatus(null);
     setSingleError("");
     setSingleData(null);
@@ -193,16 +188,34 @@ export function B2cBulkPage() {
         );
       }
     }
-  }
+  }, [
+    businessId,
+    singleAmount,
+    singleOccasion,
+    singleRecipient,
+    singleRemarks,
+  ]);
 
   return (
     <section className='page'>
-      <h1 className='page__title'>B2C Bulk</h1>
-      <p className='page__desc'>
-        Calls <code>/api/v1/b2c/bulk</code> (protected).
-      </p>
+      <h1 className='page__title'>B2C</h1>
+      <p className='page__desc'>Choose single or bulk transaction.</p>
 
       <div className='form'>
+        <label className='label'>
+          Transaction type
+          <select
+            className='input'
+            value={mode}
+            onChange={(e) =>
+              setMode(e.target.value === "single" ? "single" : "bulk")
+            }
+          >
+            <option value='bulk'>Bulk</option>
+            <option value='single'>Single</option>
+          </select>
+        </label>
+
         <label className='label'>
           Business ID (required)
           <input
@@ -214,174 +227,184 @@ export function B2cBulkPage() {
         </label>
       </div>
 
-      <h2 className='page__title' style={{ fontSize: 18 }}>
-        Single payout
-      </h2>
-      <div className='form'>
-        <label className='label'>
-          Recipient (PartyB)
-          <input
-            className='input'
-            value={singleRecipient}
-            onChange={(e) => setSingleRecipient(e.target.value)}
-          />
-        </label>
+      {mode === "single" ? (
+        <>
+          <h2 className='page__title' style={{ fontSize: 18 }}>
+            Single payout
+          </h2>
+          <div className='form'>
+            <label className='label'>
+              Recipient (PartyB)
+              <input
+                className='input'
+                value={singleRecipient}
+                onChange={(e) => setSingleRecipient(e.target.value)}
+              />
+            </label>
 
-        <label className='label'>
-          Amount
-          <input
-            className='input'
-            value={singleAmount}
-            onChange={(e) => setSingleAmount(e.target.value)}
-          />
-        </label>
+            <label className='label'>
+              Amount
+              <input
+                className='input'
+                value={singleAmount}
+                onChange={(e) => setSingleAmount(e.target.value)}
+              />
+            </label>
 
-        <label className='label'>
-          Remarks (optional)
-          <input
-            className='input'
-            value={singleRemarks}
-            onChange={(e) => setSingleRemarks(e.target.value)}
-          />
-        </label>
+            <label className='label'>
+              Remarks (optional)
+              <input
+                className='input'
+                value={singleRemarks}
+                onChange={(e) => setSingleRemarks(e.target.value)}
+              />
+            </label>
 
-        <label className='label'>
-          Occasion (optional)
-          <input
-            className='input'
-            value={singleOccasion}
-            onChange={(e) => setSingleOccasion(e.target.value)}
-          />
-        </label>
+            <label className='label'>
+              Occasion (optional)
+              <input
+                className='input'
+                value={singleOccasion}
+                onChange={(e) => setSingleOccasion(e.target.value)}
+              />
+            </label>
 
-        <div className='actions'>
-          <button
-            className='button'
-            type='button'
-            onClick={submitSingle}
-            disabled={!businessId.trim()}
-          >
-            Send single
-          </button>
-          {singleStatus !== null ? (
-            <span className='badge'>HTTP {singleStatus}</span>
-          ) : null}
-        </div>
-      </div>
-      {singleError ? <div className='error'>{singleError}</div> : null}
-      <JsonViewer value={singleData} />
+            <div className='actions'>
+              <button
+                className='button'
+                type='button'
+                onClick={() => void submitSingle()}
+                disabled={!businessId.trim()}
+              >
+                Submit single
+              </button>
+              {singleStatus !== null ? (
+                <span className='badge'>HTTP {singleStatus}</span>
+              ) : null}
+            </div>
+          </div>
 
-      <div className='form'>
-        <label className='label'>
-          Batch reference (optional)
-          <input
-            className='input'
-            value={reference}
-            onChange={(e) => setReference(e.target.value)}
-          />
-        </label>
-
-        <label className='label'>
-          Items (JSON array)
-          <textarea
-            className='input'
-            style={{ minHeight: 160 }}
-            value={itemsText}
-            onChange={(e) => setItemsText(e.target.value)}
-          />
-        </label>
-
-        <div className='actions'>
-          <button
-            className='button'
-            type='button'
-            onClick={submit}
-            disabled={loading || !businessId.trim()}
-          >
-            {loading ? "Submitting…" : "Create batch"}
-          </button>
-          <button
-            className='button'
-            type='button'
-            onClick={refreshList}
-            disabled={loading}
-          >
-            Refresh list
-          </button>
-          {status !== null ? (
-            <span className='badge'>HTTP {status}</span>
-          ) : null}
-        </div>
-      </div>
-
-      {error ? <div className='error'>{error}</div> : null}
-
-      <JsonViewer value={data} />
-
-      <h2 className='page__title' style={{ fontSize: 18 }}>
-        Recent batches
-      </h2>
-      <div className='actions'>
-        <input
-          className='input'
-          placeholder='Paste batch id to view…'
-          value={selectedBatchId}
-          onChange={(e) => setSelectedBatchId(e.target.value)}
-        />
-        <button
-          className='button'
-          type='button'
-          onClick={() => fetchDetail(selectedBatchId)}
-          disabled={!selectedBatchId.trim()}
-        >
-          View batch
-        </button>
-      </div>
-
-      {batches.length === 0 ? (
-        <div className='muted'>No batches</div>
+          {singleError ? <div className='error'>{singleError}</div> : null}
+          <JsonViewer value={singleData} />
+        </>
       ) : (
-        <div className='table-wrap'>
-          <table className='table'>
-            <thead>
-              <tr>
-                <th>id</th>
-                <th>reference</th>
-                <th>status</th>
-                <th>items</th>
-                <th>created_at</th>
-              </tr>
-            </thead>
-            <tbody>
-              {batches.map((b) => (
-                <tr key={b.id}>
-                  <td>
-                    <button
-                      className='button'
-                      type='button'
-                      onClick={() => {
-                        setSelectedBatchId(b.id);
-                        void fetchDetail(b.id);
-                      }}
-                    >
-                      {b.id}
-                    </button>
-                  </td>
-                  <td>{String(b.reference || "")}</td>
-                  <td>{String(b.status || "")}</td>
-                  <td>{String(b.items_count ?? "")}</td>
-                  <td>{String(b.created_at || "")}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+        <>
+          <h2 className='page__title' style={{ fontSize: 18 }}>
+            Bulk payouts
+          </h2>
 
-      <h2 className='page__title' style={{ fontSize: 18 }}>
-        Batch detail
-      </h2>
-      <JsonViewer value={detail} />
+          <div className='form'>
+            <label className='label'>
+              Batch reference (optional)
+              <input
+                className='input'
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+              />
+            </label>
+
+            <label className='label'>
+              Items (JSON array)
+              <textarea
+                className='input'
+                style={{ minHeight: 160 }}
+                value={itemsText}
+                onChange={(e) => setItemsText(e.target.value)}
+              />
+            </label>
+
+            <div className='actions'>
+              <button
+                className='button'
+                type='button'
+                onClick={() => void submit()}
+                disabled={loading || !businessId.trim()}
+              >
+                {loading ? "Submitting…" : "Create batch"}
+              </button>
+              <button
+                className='button'
+                type='button'
+                onClick={() => void refreshList()}
+                disabled={loading}
+              >
+                Refresh list
+              </button>
+              {status !== null ? (
+                <span className='badge'>HTTP {status}</span>
+              ) : null}
+            </div>
+          </div>
+
+          {error ? <div className='error'>{error}</div> : null}
+          <JsonViewer value={data} />
+
+          <h2 className='page__title' style={{ fontSize: 18 }}>
+            Recent batches
+          </h2>
+          <div className='actions'>
+            <input
+              className='input'
+              placeholder='Paste batch id to view…'
+              value={selectedBatchId}
+              onChange={(e) => setSelectedBatchId(e.target.value)}
+            />
+            <button
+              className='button'
+              type='button'
+              onClick={() => void fetchDetail(selectedBatchId)}
+              disabled={!selectedBatchId.trim()}
+            >
+              View batch
+            </button>
+          </div>
+
+          {batches.length === 0 ? (
+            <div className='muted'>No batches</div>
+          ) : (
+            <div className='table-wrap'>
+              <table className='table'>
+                <thead>
+                  <tr>
+                    <th>id</th>
+                    <th>reference</th>
+                    <th>status</th>
+                    <th>items</th>
+                    <th>created_at</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {batches.map((b) => (
+                    <tr key={b.id}>
+                      <td>
+                        <button
+                          className='button'
+                          type='button'
+                          onClick={() => {
+                            setSelectedBatchId(b.id);
+                            void fetchDetail(b.id);
+                          }}
+                        >
+                          {b.id}
+                        </button>
+                      </td>
+                      <td>{String(b.reference || "")}</td>
+                      <td>{String(b.status || "")}</td>
+                      <td>{String(b.items_count ?? "")}</td>
+                      <td>{String(b.created_at || "")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <h2 className='page__title' style={{ fontSize: 18 }}>
+            Batch detail
+          </h2>
+          <JsonViewer value={detail} />
+        </>
+      )}
     </section>
   );
 }
