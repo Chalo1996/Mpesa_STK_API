@@ -16,6 +16,12 @@ make run
 make superuser
 ```
 
+If you need a UI-friendly way to create the _first_ superuser (e.g. production bootstrap), the dashboard includes a hidden route:
+
+- `/bootstrap/superuser`
+
+This requires the backend env var `BOOTSTRAP_SUPERUSER_TOKEN` and will only work if no superuser exists.
+
 3. Start the dashboard (port 5173):
 
 ```bash

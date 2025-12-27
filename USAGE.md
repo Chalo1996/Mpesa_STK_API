@@ -14,14 +14,14 @@ make migrations
 make run
 ```
 
-1. Create a staff user (superuser):
+2. Create a staff user (superuser):
 
 ```bash
 source .venv/bin/activate
 make superuser
 ```
 
-1. Start the dashboard:
+3. Start the dashboard:
 
 ```bash
 cd frontend
@@ -30,6 +30,8 @@ npm run dev
 ```
 
 Open `http://localhost:5173` and log in with your Django admin username/password.
+
+If you cannot run `createsuperuser` (e.g. production bootstrap), use the guarded UI bootstrap flow described in `README.md`.
 
 If you see CSRF errors, add this to `.env`:
 
@@ -190,6 +192,20 @@ PHONE_NUMBER=2547XXXXXXXX
 ACCOUNT_REFERENCE=TEST-001
 ```
 
+Multi-tenant usage notes:
+
+- You can optionally pass a `shortcode` in the request body to use a stored per-business shortcode/passkey and default callback URL.
+- You can also override the callback URL per request via `callback_url`.
+
+Example with per-business shortcode:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/c2b/stk/push \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"amount": 1, "phone_number": "2547XXXXXXXX", "shortcode": "174379", "account_reference": "ORDER-123", "callback_url": "https://<your-public-host>/api/v1/c2b/stk/callback"}'
+```
+
 ## 6) List transactions
 
 All transactions:
@@ -203,6 +219,13 @@ Completed transactions:
 
 ```bash
 curl -X GET http://127.0.0.1:8000/api/v1/transactions/completed \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+Filter by business:
+
+```bash
+curl -X GET "http://127.0.0.1:8000/api/v1/transactions/all?business_id=<BUSINESS_UUID>" \
   -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
@@ -245,13 +268,18 @@ curl -X POST http://127.0.0.1:8000/api/v1/ratiba/create \
 
 ## 6d) Create B2C/B2B bulk batches
 
+Notes:
+
+- `business_id` is required for both B2C and B2B bulk create.
+- Create a Business in the dashboard onboarding UI (or Django admin) and use its UUID as `business_id`.
+
 B2C:
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/v1/b2c/bulk \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"reference":"BATCH-001","items":[{"recipient":"254700000000","amount":"1"}]}'
+  -d '{"business_id":"<BUSINESS_UUID>","reference":"BATCH-001","items":[{"recipient":"254700000000","amount":"1"}]}'
 ```
 
 B2B:
@@ -260,7 +288,7 @@ B2B:
 curl -X POST http://127.0.0.1:8000/api/v1/b2b/bulk \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"reference":"B2B-001","items":[{"recipient":"ACCT-001","amount":"1"}]}'
+  -d '{"business_id":"<BUSINESS_UUID>","reference":"B2B-001","items":[{"recipient":"ACCT-001","amount":"1"}]}'
 ```
 
 ## 7) Quick callback sanity checks (via ngrok)

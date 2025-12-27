@@ -74,6 +74,10 @@ This repo supports a guarded bootstrap endpoint + SPA page:
   - the same bootstrap token
   - username + password (+ optional email)
 
+Implementation detail:
+
+- The backend expects the token in header `X-Bootstrap-Token: <token>`.
+
 Security notes:
 
 - The endpoint only works when **no superuser exists**.
@@ -192,6 +196,12 @@ POST /api/v1/stk/callback
 POST /api/v1/stk/error
 GET  /api/v1/transactions/all
 GET  /api/v1/transactions/completed
+
+Notes:
+
+- Transactions endpoints support optional filtering by business: `?business_id=<uuid>`
+- `POST /api/v1/b2c/bulk` and `POST /api/v1/b2b/bulk` require `business_id` in the request body.
+- `POST /api/v1/c2b/stk/push` optionally accepts `shortcode`, `callback_url`, and `account_reference` for per-business / per-request behavior.
 
 # OAuth2 (third-party gateway)
 POST /api/v1/oauth/token/
