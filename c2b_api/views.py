@@ -14,10 +14,21 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from requests.auth import HTTPBasicAuth
 
-from mpesa_api.models import MpesaCallBacks, MpesaCalls, MpesaPayment
+from mpesa_api.models import MpesaCallBacks, MpesaCalls, MpesaPayment, StkPushInitiation
 from mpesa_api.mpesa_credentials import LipanaMpesaPassword, MpesaC2bCredential
 from services_common.auth import require_oauth2, require_staff
 from services_common.http import json_body, parse_mpesa_timestamp
+
+
+def _resolve_shortcode(shortcode: str | None):
+    if not shortcode:
+        return None
+    try:
+        from business_api.models import MpesaShortcode
+
+        return MpesaShortcode.objects.select_related("business").filter(shortcode=str(shortcode)).first()
+    except Exception:
+        return None
 
 
 @require_staff
@@ -61,20 +72,37 @@ def stk_push(request):
                 status=500,
             )
 
-        password, timestamp = LipanaMpesaPassword.generate_password()
         body = json_body(request)
 
+        shortcode_value = str(body.get("shortcode") or body.get("business_shortcode") or "").strip()
+        shortcode_obj = _resolve_shortcode(shortcode_value)
+
+        # Backward compatible fallback to env-based config if shortcode not provided.
+        effective_shortcode = shortcode_obj.shortcode if shortcode_obj else LipanaMpesaPassword.BUSINESS_SHORT_CODE
+        effective_passkey = shortcode_obj.lipa_passkey if shortcode_obj else None
+        password, timestamp = LipanaMpesaPassword.generate_password(
+            business_shortcode=effective_shortcode,
+            passkey=effective_passkey,
+        )
+
+        callback_url = (
+            str(body.get("callback_url") or "").strip()
+            or (shortcode_obj.default_stk_callback_url if shortcode_obj else "")
+            or os.getenv("STK_CALLBACK_URL", "")
+        )
+        account_reference = str(body.get("account_reference") or "").strip()[:64] or os.getenv("ACCOUNT_REFERENCE")
+
         payload = {
-            "BusinessShortCode": LipanaMpesaPassword.BUSINESS_SHORT_CODE,
+            "BusinessShortCode": effective_shortcode,
             "Password": password,
             "Timestamp": timestamp,
             "TransactionType": "CustomerPayBillOnline",
             "Amount": body.get("amount", 1),
             "PartyA": body.get("party_a") or os.getenv("PARTY_A"),
-            "PartyB": LipanaMpesaPassword.BUSINESS_SHORT_CODE,
+            "PartyB": effective_shortcode,
             "PhoneNumber": body.get("phone_number") or os.getenv("PHONE_NUMBER"),
-            "CallBackURL": os.getenv("STK_CALLBACK_URL", ""),
-            "AccountReference": os.getenv("ACCOUNT_REFERENCE"),
+            "CallBackURL": callback_url,
+            "AccountReference": account_reference,
             "TransactionDesc": "Testing STK push",
         }
 
@@ -86,6 +114,8 @@ def stk_push(request):
             caller="STK Push Request",
             conversation_id=payload.get("AccountReference", ""),
             content=json.dumps(payload),
+            business=shortcode_obj.business if shortcode_obj else None,
+            shortcode=shortcode_obj,
         )
 
         response = requests.post(api_url, json=payload, headers=headers, timeout=30)
@@ -93,6 +123,21 @@ def stk_push(request):
             response_data = response.json()
         except Exception:
             response_data = {"error": "Invalid JSON response", "status_code": response.status_code}
+
+        # Persist mapping for tenancy resolution on callback.
+        if isinstance(response_data, dict):
+            merchant_request_id = response_data.get("MerchantRequestID")
+            checkout_request_id = response_data.get("CheckoutRequestID")
+            if merchant_request_id or checkout_request_id:
+                StkPushInitiation.objects.create(
+                    business=shortcode_obj.business if shortcode_obj else None,
+                    shortcode=shortcode_obj,
+                    merchant_request_id=merchant_request_id,
+                    checkout_request_id=checkout_request_id,
+                    account_reference=account_reference or "",
+                    request_payload=payload,
+                    response_payload=response_data,
+                )
 
         return JsonResponse(response_data)
     except Exception as e:
@@ -160,11 +205,15 @@ def confirmation(request):
     try:
         mpesa_body = json_body(request)
 
+        shortcode_obj = _resolve_shortcode(mpesa_body.get("BusinessShortCode") or mpesa_body.get("ShortCode"))
+
         MpesaCalls.objects.create(
             ip_address=request.META.get("REMOTE_ADDR"),
             caller="Confirmation Callback",
             conversation_id=mpesa_body.get("TransID", ""),
             content=json.dumps(mpesa_body),
+            business=shortcode_obj.business if shortcode_obj else None,
+            shortcode=shortcode_obj,
         )
 
         MpesaPayment.objects.create(
@@ -175,6 +224,8 @@ def confirmation(request):
             status="successful",
             result_code=0,
             result_description="C2B Confirmation",
+            business=shortcode_obj.business if shortcode_obj else None,
+            shortcode=shortcode_obj,
         )
 
         return JsonResponse({"ResultCode": 0, "ResultDesc": "Accepted"})
@@ -213,6 +264,14 @@ def stk_callback(request):
         transaction_date = parse_mpesa_timestamp(transaction_date)
         status = "successful" if result_code == 0 else "failed"
 
+        initiation = None
+        if checkout_request_id:
+            initiation = (
+                StkPushInitiation.objects.select_related("business", "shortcode")
+                .filter(checkout_request_id=checkout_request_id)
+                .first()
+            )
+
         MpesaPayment.objects.create(
             merchant_request_id=merchant_request_id,
             checkout_request_id=checkout_request_id,
@@ -223,6 +282,8 @@ def stk_callback(request):
             transaction_date=transaction_date,
             phone_number=phone_number,
             status=status,
+            business=initiation.business if initiation else None,
+            shortcode=initiation.shortcode if initiation else None,
         )
 
         MpesaCallBacks.objects.create(
@@ -232,6 +293,8 @@ def stk_callback(request):
             content=stk_callback_data,
             result_code=result_code,
             result_description=result_desc,
+            business=initiation.business if initiation else None,
+            shortcode=initiation.shortcode if initiation else None,
         )
 
         return JsonResponse({"ResultCode": 0, "ResultDesc": "Received Successfully"})
@@ -251,6 +314,14 @@ def stk_error(request):
         result_code = error_data.get("ResultCode", "")
         result_desc = error_data.get("ResultDesc", "")
 
+        initiation = None
+        if merchant_request_id:
+            initiation = (
+                StkPushInitiation.objects.select_related("business", "shortcode")
+                .filter(merchant_request_id=merchant_request_id)
+                .first()
+            )
+
         MpesaCallBacks.objects.create(
             ip_address=request.META.get("REMOTE_ADDR"),
             caller="STK Push Error",
@@ -258,6 +329,8 @@ def stk_error(request):
             content=error_data,
             result_code=result_code,
             result_description=result_desc,
+            business=initiation.business if initiation else None,
+            shortcode=initiation.shortcode if initiation else None,
         )
 
         return JsonResponse({"status": "error received"})
@@ -275,6 +348,10 @@ def transactions_completed(request):
         status_filter = request.GET.get("status", None)
 
         transactions = MpesaPayment.objects.all()
+
+        business_id = request.GET.get("business_id")
+        if business_id:
+            transactions = transactions.filter(business_id=business_id)
 
         if date_filter:
             try:
@@ -304,6 +381,10 @@ def transactions_all(request):
         return JsonResponse({"error": "Method not allowed"}, status=405)
     try:
         transactions = MpesaPayment.objects.all()
+
+        business_id = request.GET.get("business_id")
+        if business_id:
+            transactions = transactions.filter(business_id=business_id)
         return JsonResponse({"transactions": list(transactions.values())})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)

@@ -42,12 +42,22 @@ class LipanaMpesaPassword:
     PASSKEY = os.getenv('LIPA_NA_MPESA_PASSKEY')
 
     @staticmethod
-    def generate_password():
-        """Generates Base64 encoded password"""
+    def generate_password(*, business_shortcode: str | None = None, passkey: str | None = None):
+        """Generates Base64 encoded password.
+
+        Optionally accepts per-request shortcode/passkey (for multi-tenant usage).
+        Falls back to environment variables when not provided.
+        """
+
         lipa_time = datetime.now().strftime('%Y%m%d%H%M%S')
-        if not LipanaMpesaPassword.BUSINESS_SHORT_CODE or not LipanaMpesaPassword.PASSKEY:
+
+        shortcode = (business_shortcode or LipanaMpesaPassword.BUSINESS_SHORT_CODE or "").strip()
+        effective_passkey = (passkey or LipanaMpesaPassword.PASSKEY or "").strip()
+
+        if not shortcode or not effective_passkey:
             raise ValueError("BUSINESS_SHORTCODE and LIPA_NA_MPESA_PASSKEY must be set")
-        data_to_encode = LipanaMpesaPassword.BUSINESS_SHORT_CODE + LipanaMpesaPassword.PASSKEY + lipa_time
+
+        data_to_encode = shortcode + effective_passkey + lipa_time
         encoded_password = base64.b64encode(data_to_encode.encode()).decode('utf-8')
         return encoded_password, lipa_time
 
