@@ -19,6 +19,7 @@ def _json_body(request):
 def _serialize_batch(batch: BulkPayoutBatch):
     return {
         "id": str(batch.id),
+        "business_id": str(batch.business_id) if getattr(batch, "business_id", None) else None,
         "created_at": batch.created_at.isoformat() if batch.created_at else None,
         "updated_at": batch.updated_at.isoformat() if batch.updated_at else None,
         "reference": batch.reference,
@@ -54,8 +55,18 @@ def bulk_create(request):
         return JsonResponse({"error": "items must be a non-empty list"}, status=400)
 
     reference = str(body.get("reference", "")).strip()[:64]
+    business_id = body.get("business_id")
+    if not business_id:
+        return JsonResponse({"error": "business_id is required"}, status=400)
+    try:
+        from business_api.models import Business
+
+        business = Business.objects.get(id=business_id)
+    except Exception:
+        return JsonResponse({"error": "Invalid business_id"}, status=400)
+
     meta = {k: v for k, v in body.items() if k not in {"items"}}
-    batch = BulkPayoutBatch.objects.create(reference=reference, meta=meta)
+    batch = BulkPayoutBatch.objects.create(reference=reference, meta=meta, business=business)
 
     created = 0
     for raw in items:

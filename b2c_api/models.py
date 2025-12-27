@@ -18,6 +18,14 @@ class BulkPayoutBatch(models.Model):
 	meta = models.JSONField(default=dict, blank=True)
 	last_error = models.TextField(blank=True, default="")
 
+	business = models.ForeignKey(
+		"business_api.Business",
+		null=True,
+		blank=True,
+		on_delete=models.SET_NULL,
+		related_name="b2c_batches",
+	)
+
 	class Meta:
 		ordering = ["-created_at"]
 

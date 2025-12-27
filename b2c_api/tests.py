@@ -8,10 +8,13 @@ from django.utils import timezone
 
 from oauth2_provider.models import AccessToken, Application
 
+from business_api.models import Business
+
 
 class B2CBulkApiTests(TestCase):
 	def setUp(self):
 		self.access_token = self._create_access_token(scope="b2c:write")
+		self.business = Business.objects.create(name="Shop A")
 
 	def _create_access_token(self, scope: str) -> str:
 		User = get_user_model()
@@ -46,6 +49,7 @@ class B2CBulkApiTests(TestCase):
 			"/api/v1/b2c/bulk",
 			data=json.dumps(
 				{
+					"business_id": str(self.business.id),
 					"reference": "BATCH-001",
 					"items": [
 						{"recipient": "254700000000", "amount": "1", "currency": "KES"},
@@ -60,6 +64,7 @@ class B2CBulkApiTests(TestCase):
 		payload = create.json()
 		self.assertTrue(payload.get("ok"))
 		batch_id = payload["batch"]["id"]
+		self.assertEqual(payload["batch"]["business_id"], str(self.business.id))
 
 		User = get_user_model()
 		staff = User.objects.create_user(username="staff", password="pw")
