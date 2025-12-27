@@ -30,6 +30,7 @@ jobs:
               uses: github/codeql-action/init@v3
               with:
                   languages: ${{ matrix.language }}
+                                    config-file: ./.github/codeql/codeql-config.yml
 
             # For this repo, CodeQL can typically auto-build both languages.
             # If you later add a non-standard build step, switch this to a manual build.

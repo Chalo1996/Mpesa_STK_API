@@ -1,0 +1,16 @@
+# Minimal CodeQL configuration.
+# Purpose: reduce noise by ignoring generated artifacts and local env folders.
+
+paths-ignore:
+  - "**/__pycache__/**"
+  - "**/*.pyc"
+  - ".venv/**"
+  - "db.sqlite3"
+
+  # Frontend build output / deps
+  - "frontend/node_modules/**"
+  - "frontend/dist/**"
+
+  # Generic build outputs
+  - "**/build/**"
+  - "**/dist/**"
