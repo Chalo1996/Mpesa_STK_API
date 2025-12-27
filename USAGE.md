@@ -79,6 +79,44 @@ Scope mapping (high level):
 - B2C bulk create: `b2c:write`
 - B2B bulk create: `b2b:write`
 
+## B2C single (Safaricom v3)
+
+This calls _your local API_, which then calls Safaricom’s B2C v3 `paymentrequest` endpoint.
+
+Required `.env` values for B2C submission:
+
+```dotenv
+MPESA_B2C_INITIATOR_NAME=<your_initiator>
+MPESA_B2C_SECURITY_CREDENTIAL=<your_security_credential>
+MPESA_B2C_QUEUE_TIMEOUT_URL=https://<your-public-host>/api/v1/b2c/callback/timeout
+MPESA_B2C_RESULT_URL=https://<your-public-host>/api/v1/b2c/callback/result
+
+# Optional convenience defaults
+MPESA_B2C_PARTY_A=600000
+MPESA_B2C_COMMAND_ID=BusinessPayment
+MPESA_B2C_API_BASE_URL=https://sandbox.safaricom.co.ke
+```
+
+Initiate a single payout:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/b2c/single \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "business_id": "<BUSINESS_UUID>",
+    "party_b": "2547XXXXXXXX",
+    "amount": 1,
+    "remarks": "test",
+    "occasion": ""
+  }'
+```
+
+Callbacks (called by Safaricom):
+
+- ResultURL: `POST /api/v1/b2c/callback/result`
+- QueueTimeOutURL: `POST /api/v1/b2c/callback/timeout`
+
 ## 2) Start the app
 
 ```bash

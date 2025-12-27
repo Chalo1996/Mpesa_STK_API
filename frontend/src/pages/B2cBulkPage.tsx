@@ -20,6 +20,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function B2cBulkPage() {
+  const [businessId, setBusinessId] = useState("");
+
+  const [singleRecipient, setSingleRecipient] = useState("254700000000");
+  const [singleAmount, setSingleAmount] = useState("1");
+  const [singleRemarks, setSingleRemarks] = useState("");
+  const [singleOccasion, setSingleOccasion] = useState("");
+  const [singleStatus, setSingleStatus] = useState<number | null>(null);
+  const [singleError, setSingleError] = useState<string>("");
+  const [singleData, setSingleData] = useState<unknown>(null);
+
   const [reference, setReference] = useState("B2C-001");
   const [itemsText, setItemsText] = useState(
     JSON.stringify(
@@ -102,6 +112,7 @@ export function B2cBulkPage() {
       const items = parsed as unknown[];
 
       const payload = {
+        business_id: businessId.trim(),
         reference: reference.trim(),
         items,
       };
@@ -147,12 +158,118 @@ export function B2cBulkPage() {
     }
   }
 
+  async function submitSingle() {
+    setSingleStatus(null);
+    setSingleError("");
+    setSingleData(null);
+
+    const payload = {
+      business_id: businessId.trim(),
+      party_b: singleRecipient.trim(),
+      amount: singleAmount.trim(),
+      remarks: singleRemarks.trim(),
+      occasion: singleOccasion.trim(),
+    };
+
+    const res = await apiRequest("/api/v1/b2c/single", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+
+    setSingleStatus(res.status);
+    setSingleData(res.data);
+    if (res.status < 200 || res.status >= 300) {
+      const apiError =
+        isRecord(res.data) && typeof res.data["error"] === "string"
+          ? (res.data["error"] as string)
+          : "";
+      if (res.status === 401 && apiError === "Missing API key") {
+        setSingleError("Please sign in with a staff account to submit B2C.");
+      } else {
+        setSingleError(
+          typeof res.data === "object"
+            ? JSON.stringify(res.data)
+            : String(res.data || "Request failed")
+        );
+      }
+    }
+  }
+
   return (
     <section className='page'>
       <h1 className='page__title'>B2C Bulk</h1>
       <p className='page__desc'>
         Calls <code>/api/v1/b2c/bulk</code> (protected).
       </p>
+
+      <div className='form'>
+        <label className='label'>
+          Business ID (required)
+          <input
+            className='input'
+            value={businessId}
+            onChange={(e) => setBusinessId(e.target.value)}
+            placeholder='UUID…'
+          />
+        </label>
+      </div>
+
+      <h2 className='page__title' style={{ fontSize: 18 }}>
+        Single payout
+      </h2>
+      <div className='form'>
+        <label className='label'>
+          Recipient (PartyB)
+          <input
+            className='input'
+            value={singleRecipient}
+            onChange={(e) => setSingleRecipient(e.target.value)}
+          />
+        </label>
+
+        <label className='label'>
+          Amount
+          <input
+            className='input'
+            value={singleAmount}
+            onChange={(e) => setSingleAmount(e.target.value)}
+          />
+        </label>
+
+        <label className='label'>
+          Remarks (optional)
+          <input
+            className='input'
+            value={singleRemarks}
+            onChange={(e) => setSingleRemarks(e.target.value)}
+          />
+        </label>
+
+        <label className='label'>
+          Occasion (optional)
+          <input
+            className='input'
+            value={singleOccasion}
+            onChange={(e) => setSingleOccasion(e.target.value)}
+          />
+        </label>
+
+        <div className='actions'>
+          <button
+            className='button'
+            type='button'
+            onClick={submitSingle}
+            disabled={!businessId.trim()}
+          >
+            Send single
+          </button>
+          {singleStatus !== null ? (
+            <span className='badge'>HTTP {singleStatus}</span>
+          ) : null}
+        </div>
+      </div>
+      {singleError ? <div className='error'>{singleError}</div> : null}
+      <JsonViewer value={singleData} />
 
       <div className='form'>
         <label className='label'>
@@ -179,7 +296,7 @@ export function B2cBulkPage() {
             className='button'
             type='button'
             onClick={submit}
-            disabled={loading}
+            disabled={loading || !businessId.trim()}
           >
             {loading ? "Submitting…" : "Create batch"}
           </button>
